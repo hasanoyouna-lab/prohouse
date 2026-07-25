@@ -1,0 +1,123 @@
+// ==================== وحدة المزامنة (طابور حفظ محلي + كاش قراءة) ====================
+// كل الحفظ يمر من هون: يُكتب فوراً بالكاش المحلي (تجربة استخدام فورية)،
+// ينضاف لطابور الانتظار، ويحاول يتزامن مع Apps Script فوراً ثم عند رجوع النت.
+
+const Sync = (() => {
+  const QUEUE_KEY = "ph_pending_queue";
+  const listeners = [];
+
+  function onStatusChange(fn) { listeners.push(fn); }
+  function emitStatus() {
+    const q = getQueue();
+    listeners.forEach(fn => fn({ pending: q.length }));
+  }
+
+  function getQueue() {
+    try { return JSON.parse(localStorage.getItem(QUEUE_KEY)) || []; }
+    catch (e) { return []; }
+  }
+  function setQueue(q) {
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+    emitStatus();
+  }
+
+  function cacheGet(key) {
+    try {
+      const raw = localStorage.getItem("ph_cache:" + key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  function cacheSet(key, value) {
+    localStorage.setItem("ph_cache:" + key, JSON.stringify({ value, fetchedAt: Date.now() }));
+  }
+
+  // ---- طلبات القراءة (GET) — cache-then-network ----
+  async function get(action, params, cacheKey, onFresh) {
+    const ck = cacheKey || action;
+    const cached = cacheGet(ck);
+    if (cached) onFresh && onFresh(cached.value, true);
+
+    if (!API_URL) return cached ? cached.value : null;
+
+    try {
+      const qs = new URLSearchParams({ action, ...(params || {}) }).toString();
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 15000);
+      const res = await fetch(API_URL + "?" + qs, { signal: controller.signal });
+      clearTimeout(t);
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || "server error");
+      cacheSet(ck, json.data);
+      onFresh && onFresh(json.data, false);
+      return json.data;
+    } catch (e) {
+      console.warn("Sync.get failed, falling back to cache:", action, e);
+      return cached ? cached.value : null;
+    }
+  }
+
+  // ---- طلبات الكتابة (POST) — عبر الطابور ----
+  function enqueue(dedupeKey, action, payload) {
+    const q = getQueue();
+    const existingIdx = q.findIndex(item => item.key === dedupeKey);
+    const entry = {
+      id: existingIdx >= 0 ? q[existingIdx].id : (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random())),
+      key: dedupeKey, action, payload,
+      createdAt: Date.now(), attempts: 0, lastError: null, lastAttemptAt: null
+    };
+    if (existingIdx >= 0) q[existingIdx] = entry; else q.push(entry);
+    setQueue(q);
+    flushQueue();
+    return entry.id;
+  }
+
+  async function postOnce(action, payload) {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" }, // يتفادى CORS preflight مع Apps Script
+      body: JSON.stringify({ action, payload })
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || "server error");
+    return json.data;
+  }
+
+  let flushing = false;
+  async function flushQueue() {
+    if (flushing) return;
+    if (!API_URL) return; // ما نُشر الباك اند بعد
+    flushing = true;
+    try {
+      let q = getQueue();
+      for (let i = 0; i < q.length; i++) {
+        const item = q[i];
+        const backoff = Math.min(Math.pow(2, item.attempts) * 5000, 5 * 60000);
+        if (item.lastAttemptAt && Date.now() - item.lastAttemptAt < backoff) continue;
+        try {
+          item.lastAttemptAt = Date.now();
+          await postOnce(item.action, item.payload);
+          q = q.filter(x => x.id !== item.id);
+          setQueue(q);
+        } catch (e) {
+          item.attempts += 1;
+          item.lastError = String(e);
+          setQueue(q);
+          break; // نوقف باقي الطابور — غالباً السبب انقطاع نت/سيرفر
+        }
+      }
+    } finally {
+      flushing = false;
+    }
+  }
+
+  window.addEventListener("online", flushQueue);
+  setInterval(flushQueue, 45000);
+
+  return { get, enqueue, flushQueue, getQueue, cacheGet, cacheSet, onStatusChange, emitStatus };
+})();
+
+// ==================== هوية الموظف الحالي ====================
+const Employee = {
+  get() { return localStorage.getItem("ph_employee") || ""; },
+  set(name) { localStorage.setItem("ph_employee", name); }
+};

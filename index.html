@@ -3,484 +3,88 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>استلام وإرجاع الأصناف — عبداللطيف جميل</title>
-<style>
-  :root{
-    --navy:#1F3B57;
-    --navy-light:#2c5079;
-    --gold:#B8860B;
-    --gold-light:#d9a72c;
-    --bg:#F5F6F8;
-    --card:#FFFFFF;
-    --red:#C0392B;
-    --red-bg:#FDECEA;
-    --green:#1E7B4D;
-    --green-bg:#E7F7EE;
-    --gray:#8A8F98;
-    --border:#E3E6EA;
-    --text:#1C2430;
-  }
-  *{box-sizing:border-box;}
-  body{
-    margin:0; font-family:-apple-system, "SF Pro Text", Tahoma, Arial, sans-serif;
-    background:var(--bg); color:var(--text); padding-bottom:96px;
-    -webkit-tap-highlight-color: transparent;
-  }
-  header{
-    background:linear-gradient(135deg, var(--navy), var(--navy-light));
-    color:#fff; padding:18px 16px 14px; position:sticky; top:0; z-index:20;
-    box-shadow:0 2px 10px rgba(0,0,0,.15);
-  }
-  header h1{ margin:0; font-size:18px; font-weight:800; }
-  header .sub{ font-size:12.5px; opacity:.85; margin-top:2px; }
-  .datebar{
-    display:flex; align-items:center; gap:8px; margin-top:12px;
-  }
-  .datebar input[type=date], .datebar input[type=month]{
-    flex:1; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.35);
-    color:#fff; border-radius:10px; padding:9px 10px; font-size:14px; font-family:inherit;
-  }
-  .datebar input::-webkit-calendar-picker-indicator{ filter:invert(1); }
-  .tabs{
-    display:flex; gap:6px; margin-top:12px; background:rgba(255,255,255,.1); border-radius:12px; padding:4px;
-  }
-  .tab-btn{
-    flex:1; text-align:center; padding:9px 6px; border-radius:9px; border:none;
-    background:transparent; color:#fff; font-size:13.5px; font-weight:700; opacity:.75;
-    font-family:inherit; cursor:pointer;
-  }
-  .tab-btn.active{ background:#fff; color:var(--navy); opacity:1; }
-
-  main{ padding:14px 12px 10px; max-width:640px; margin:0 auto; }
-
-  .cat-title{
-    font-size:13px; font-weight:800; color:var(--gold); margin:18px 4px 8px;
-    display:flex; align-items:center; gap:6px;
-  }
-  .cat-title:first-child{ margin-top:4px; }
-  .cat-title::before{ content:""; width:6px; height:6px; border-radius:50%; background:var(--gold); }
-
-  .item-card{
-    background:var(--card); border:1px solid var(--border); border-radius:14px;
-    padding:12px 12px 10px; margin-bottom:10px;
-  }
-  .item-name{ font-size:14.5px; font-weight:800; }
-  .item-unit{ font-size:11.5px; color:var(--gray); margin-right:6px; }
-  .inputs-row{ display:flex; gap:8px; margin-top:10px; }
-  .field{ flex:1; }
-  .field label{ display:block; font-size:11px; color:var(--gray); margin-bottom:4px; font-weight:600; }
-  .field input[type=number]{
-    width:100%; border:1.5px solid var(--border); border-radius:10px; padding:9px 8px;
-    font-size:15px; font-family:inherit; background:#FCFCFD; text-align:center;
-  }
-  .field input[type=number]:focus{ outline:none; border-color:var(--navy-light); background:#fff; }
-  .notes-row{ margin-top:8px; }
-  .notes-row input[type=text]{
-    width:100%; border:1.5px solid var(--border); border-radius:10px; padding:8px 10px;
-    font-size:13px; font-family:inherit; background:#FCFCFD;
-  }
-  .badges{ display:flex; gap:6px; margin-top:9px; flex-wrap:wrap; }
-  .badge{
-    font-size:11.5px; font-weight:700; padding:5px 9px; border-radius:20px;
-    display:inline-flex; align-items:center; gap:4px;
-  }
-  .badge.ok{ background:var(--green-bg); color:var(--green); }
-  .badge.warn{ background:var(--red-bg); color:var(--red); }
-  .badge.neutral{ background:#EEF0F3; color:var(--gray); }
-
-  .save-bar{
-    position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--border);
-    padding:10px 14px calc(10px + env(safe-area-inset-bottom)); display:flex; gap:10px; align-items:center;
-    z-index:30; box-shadow:0 -4px 14px rgba(0,0,0,.06);
-  }
-  .save-status{ font-size:11.5px; color:var(--gray); flex:1; }
-  .save-btn{
-    background:var(--navy); color:#fff; border:none; border-radius:12px; padding:13px 26px;
-    font-size:15px; font-weight:800; font-family:inherit; cursor:pointer;
-  }
-  .save-btn:active{ background:var(--navy-light); }
-
-  /* التقرير */
-  .report-card{
-    background:var(--card); border:1px solid var(--border); border-radius:14px;
-    padding:12px; margin-bottom:9px;
-  }
-  .report-card .top-row{ display:flex; justify-content:space-between; align-items:baseline; }
-  .report-card .name{ font-size:14px; font-weight:800; }
-  .report-card .cat{ font-size:11px; color:var(--gray); }
-  .stat-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:9px; }
-  .stat{ background:#FAFBFC; border-radius:9px; padding:7px 4px; text-align:center; }
-  .stat .v{ font-size:14px; font-weight:800; color:var(--navy); }
-  .stat .l{ font-size:9.5px; color:var(--gray); margin-top:1px; }
-
-  .summary-banner{
-    background:var(--card); border:1.5px solid var(--gold); border-radius:14px;
-    padding:14px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between;
-  }
-  .summary-banner .big{ font-size:26px; font-weight:900; color:var(--red); }
-  .summary-banner .lbl{ font-size:12.5px; color:var(--text); font-weight:700; max-width:70%; }
-
-  .empty-state{ text-align:center; padding:40px 16px; color:var(--gray); font-size:13.5px; }
-  .hidden{ display:none !important; }
-  .loader{ text-align:center; padding:30px; color:var(--gray); font-size:13px; }
-  .toast{
-    position:fixed; top:14px; left:50%; transform:translateX(-50%) translateY(-20px);
-    background:var(--navy); color:#fff; padding:10px 18px; border-radius:30px; font-size:13px;
-    font-weight:700; z-index:100; opacity:0; transition:all .25s ease; pointer-events:none;
-    box-shadow:0 6px 20px rgba(0,0,0,.2);
-  }
-  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
-</style>
+<title>Pro House — استلام وإرجاع الأصناف</title>
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
 <header>
-  <h1>استلام وإرجاع الأصناف</h1>
-  <div class="sub">فرع عبداللطيف جميل ← الروضة</div>
+  <div class="header-top">
+    <img id="headerLogoImg" class="logo hidden" alt="Pro House">
+    <div id="headerLogoText" class="logo-text">PRO<span>HOUSE</span></div>
+    <div class="title-block">
+      <h1 class="brand-name">Pro House</h1>
+      <div class="sub brand-branch">فرع عبداللطيف جميل ← الروضة</div>
+    </div>
+    <button class="sync-badge" id="syncBadge" title="حالة المزامنة">🔄 متصل</button>
+  </div>
+
   <div class="tabs">
     <button class="tab-btn active" data-tab="entry">📝 إدخال اليوم</button>
-    <button class="tab-btn" data-tab="report">📊 التقرير الشهري</button>
+    <button class="tab-btn" data-tab="tomorrow">📦 طلبية الغد</button>
+    <button class="tab-btn" data-tab="report">📊 التقارير</button>
+    <button class="tab-btn" data-tab="items">🍽 إدارة الأصناف</button>
+    <button class="tab-btn" data-tab="settings">⚙ الإعدادات</button>
   </div>
+
   <div class="datebar" id="entryDateBar">
     <input type="date" id="dateInput">
   </div>
-  <div class="datebar hidden" id="reportDateBar">
-    <input type="month" id="monthInput">
+  <div class="datebar hidden" id="tomorrowDateBar">
+    <input type="date" id="tomorrowDateInput">
   </div>
 </header>
 
 <main>
-  <div id="entryView"></div>
-  <div id="reportView" class="hidden"></div>
+  <div id="offlineBanner" class="offline-banner hidden">غير متصل بالإنترنت — بتشتغل ببيانات محفوظة محلياً وبتتزامن لما يرجع النت</div>
+
+  <div id="entryView" class="view"></div>
+
+  <div id="tomorrowView" class="view hidden"></div>
+
+  <div id="reportContainer" class="view hidden">
+    <div class="toolbar">
+      <select id="reportMode">
+        <option value="day">يوم</option>
+        <option value="month" selected>شهر</option>
+        <option value="range">فترة</option>
+      </select>
+      <input type="date" id="reportDayInput" class="hidden">
+      <input type="month" id="reportMonthInput">
+      <input type="date" id="reportStartInput" class="hidden">
+      <input type="date" id="reportEndInput" class="hidden">
+      <button class="btn primary" id="reportGoBtn">عرض</button>
+      <button class="btn gold" id="exportExcelBtn">⬇ تصدير Excel</button>
+    </div>
+    <div id="reportView"></div>
+  </div>
+
+  <div id="itemsView" class="view hidden"></div>
+
+  <div id="settingsView" class="view hidden"></div>
 </main>
 
-<div class="save-bar" id="saveBar">
+<div class="save-bar" id="saveBarEntry">
   <div class="save-status" id="saveStatus">لسا ما تحفظ شي لهذا اليوم</div>
   <button class="save-btn" id="saveBtn">💾 حفظ اليوم</button>
 </div>
 
+<div class="save-bar hidden" id="saveBarTomorrow">
+  <div class="save-status" id="tomorrowStatus">لسا ما تحفظ شي</div>
+  <button class="save-btn" id="tomorrowSaveBtn">💾 حفظ الطلبية</button>
+</div>
+
 <div class="toast" id="toast"></div>
 
-<script>
-// ==================== قائمة الأصناف الرئيسية ====================
-// ⚠ لو صنف اسمه غير دقيق أو محتاج تعديل، غيّره هون بالكود مباشرة (بند MASTER_ITEMS)
-const MASTER_ITEMS = [
-  {cat:"دجاج", name:"دجاج تندر", unit:"1/3"},
-  {cat:"دجاج", name:"دجاج باربكيو", unit:"1/3"},
-  {cat:"دجاج", name:"دجاج بينك صوص", unit:"1/3"},
-  {cat:"دجاج", name:"دجاج الشيف (كاري)", unit:"1/3"},
-  {cat:"دجاج", name:"دجاج الشيف (باربكيو)", unit:"1/3"},
-  {cat:"بحري", name:"لحم الشيف (بيروفيان)", unit:"1/3"},
-  {cat:"بحري", name:"لحم الشيف (شاورما)", unit:"1/3"},
-  {cat:"بحري", name:"سالمون", unit:"1/3"},
-  {cat:"بحري", name:"سمك الشيف (جمبو)", unit:"1/3"},
-  {cat:"بحري", name:"جمبري بروفنسال", unit:"1/3"},
-  {cat:"كارب", name:"رز أبيض", unit:"1/2"},
-  {cat:"كارب", name:"رز الشيف", unit:"1/2"},
-  {cat:"كارب", name:"بطاطس ويدجز", unit:"1"},
-  {cat:"كارب", name:"مكرونة الشيف", unit:"1/3"},
-  {cat:"كارب", name:"كارب الشيف", unit:"1/3"},
-  {cat:"السلطات", name:"سلطة تونا", unit:"طاسة"},
-  {cat:"السلطات", name:"سلطة فتوش", unit:"طاسة"},
-  {cat:"السلطات", name:"سلطة سيزر", unit:"طاسة"},
-  {cat:"الحلويات", name:"كوكيز", unit:"حبة"},
-  {cat:"الحلويات", name:"براونيز", unit:"حبة"},
-  {cat:"الحلويات", name:"سينابون", unit:"حبة"},
-  {cat:"الحلويات", name:"حلى الشيف", unit:"صينية"},
-  {cat:"فطور", name:"ساندويتش روستيد", unit:"ساندويتش"},
-  {cat:"فطور", name:"ساندويتش صن رايز", unit:"ساندويتش"},
-  {cat:"فطور", name:"صن رايز بدون ديك رومي", unit:"ساندويتش"},
-  {cat:"فطور", name:"ساندويتش تونا", unit:"ساندويتش"},
-  {cat:"فطور", name:"ساندويتش كساديا", unit:"ساندويتش"},
-  {cat:"فطور", name:"ساندويتش كروك ديلوكس", unit:"ساندويتش"},
-  {cat:"فطور", name:"كرواسون بيض بالتيركي", unit:"ساندويتش"},
-  {cat:"فطور", name:"ساندويتش حلوم", unit:"ساندويتش"},
-  {cat:"فطور", name:"كلوب ساندويتش", unit:"ساندويتش"},
-  {cat:"معدات", name:"سفنديشات الفطور", unit:"-"},
-];
-
-const SHORTAGE_THRESHOLD = -0.20;   // نقص 20% أو أكثر عن المعتاد
-const SURPLUS_THRESHOLD  = 0.25;    // زيادة 25% أو أكثر عن المعتاد
-const RETURN_THRESHOLD   = 0.30;    // إرجاع 30% أو أكثر من المستلم = احتمال هدر
-
-function todayStr(){
-  const d = new Date();
-  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
-}
-function monthStr(dateStr){ return dateStr.slice(0,7); }
-
-let currentDate = todayStr();
-let currentMonth = monthStr(currentDate);
-let historicalAvg = {}; // itemIndex -> متوسط سابق
-let currentEntry = {};  // itemIndex -> {received, returned, notes}
-
-const dateInput = document.getElementById("dateInput");
-const monthInput = document.getElementById("monthInput");
-dateInput.value = currentDate;
-monthInput.value = currentMonth;
-
-function showToast(msg){
-  const t = document.getElementById("toast");
-  t.textContent = msg;
-  t.classList.add("show");
-  setTimeout(()=>t.classList.remove("show"), 2200);
-}
-
-// ==================== تبديل التابات ====================
-document.querySelectorAll(".tab-btn").forEach(btn=>{
-  btn.addEventListener("click", ()=>{
-    document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
-    btn.classList.add("active");
-    const tab = btn.dataset.tab;
-    document.getElementById("entryView").classList.toggle("hidden", tab!=="entry");
-    document.getElementById("reportView").classList.toggle("hidden", tab!=="report");
-    document.getElementById("entryDateBar").classList.toggle("hidden", tab!=="entry");
-    document.getElementById("reportDateBar").classList.toggle("hidden", tab!=="report");
-    document.getElementById("saveBar").classList.toggle("hidden", tab!=="entry");
-    if(tab==="report") loadReport();
-  });
-});
-
-// ==================== منطق الإدخال اليومي ====================
-async function loadHistoricalAverages(beforeDate){
-  const result = {};
-  try{
-    const list = await window.storage.list("day:", true);
-    if(!list || !list.keys) return result;
-    const relevantKeys = list.keys.filter(k => k.replace("day:","") < beforeDate);
-    const sums = {}, counts = {};
-    for(const key of relevantKeys){
-      try{
-        const res = await window.storage.get(key, true);
-        if(!res || !res.value) continue;
-        const data = JSON.parse(res.value);
-        if(!data.items) continue;
-        Object.keys(data.items).forEach(idx=>{
-          const rec = Number(data.items[idx].received);
-          if(!isNaN(rec) && data.items[idx].received !== "" && data.items[idx].received != null){
-            sums[idx] = (sums[idx]||0) + rec;
-            counts[idx] = (counts[idx]||0) + 1;
-          }
-        });
-      }catch(e){}
-    }
-    Object.keys(sums).forEach(idx=>{ result[idx] = sums[idx]/counts[idx]; });
-  }catch(e){ console.error(e); }
-  return result;
-}
-
-function computeStatus(received, avg){
-  if(avg === undefined || avg === null || isNaN(avg)) return {text:"لا يوجد سابق", cls:"neutral"};
-  if(received === "" || received === null || isNaN(received)) return {text:"", cls:"neutral"};
-  const diff = (received - avg) / avg;
-  if(diff <= SHORTAGE_THRESHOLD) return {text:"⚠ نقص واضح ("+Math.round(diff*100)+"%)", cls:"warn"};
-  if(diff >= SURPLUS_THRESHOLD) return {text:"⚠ زيادة غير معتادة (+"+Math.round(diff*100)+"%)", cls:"warn"};
-  return {text:"طبيعي", cls:"ok"};
-}
-function computeReturnStatus(received, returned){
-  if(received === "" || received === null || isNaN(received) || Number(received)===0) return {text:"", cls:"neutral"};
-  if(returned === "" || returned === null || isNaN(returned)) return {text:"", cls:"neutral"};
-  const pct = Number(returned)/Number(received);
-  if(pct >= RETURN_THRESHOLD) return {text:"⚠ إرجاع مرتفع "+Math.round(pct*100)+"% (هدر محتمل)", cls:"warn"};
-  return {text:"إرجاع طبيعي "+Math.round(pct*100)+"%", cls:"ok"};
-}
-
-function renderEntryView(){
-  const view = document.getElementById("entryView");
-  view.innerHTML = "";
-  let lastCat = null;
-  MASTER_ITEMS.forEach((item, idx)=>{
-    if(item.cat !== lastCat){
-      const h = document.createElement("div");
-      h.className = "cat-title";
-      h.textContent = item.cat;
-      view.appendChild(h);
-      lastCat = item.cat;
-    }
-    const entry = currentEntry[idx] || {received:"", returned:"", notes:""};
-    const card = document.createElement("div");
-    card.className = "item-card";
-    card.innerHTML = `
-      <div class="item-name">${item.name} <span class="item-unit">(${item.unit})</span></div>
-      <div class="inputs-row">
-        <div class="field">
-          <label>الكمية المستلمة (جم)</label>
-          <input type="number" inputmode="decimal" data-idx="${idx}" data-field="received" value="${entry.received}">
-        </div>
-        <div class="field">
-          <label>الكمية المرتجعة (جم)</label>
-          <input type="number" inputmode="decimal" data-idx="${idx}" data-field="returned" value="${entry.returned}">
-        </div>
-      </div>
-      <div class="notes-row">
-        <input type="text" placeholder="ملاحظة (اختياري)" data-idx="${idx}" data-field="notes" value="${entry.notes||""}">
-      </div>
-      <div class="badges" id="badges-${idx}"></div>
-    `;
-    view.appendChild(card);
-  });
-
-  view.querySelectorAll("input[data-field]").forEach(inp=>{
-    inp.addEventListener("input", onFieldChange);
-  });
-
-  MASTER_ITEMS.forEach((item, idx)=> updateBadges(idx));
-}
-
-function onFieldChange(e){
-  const idx = e.target.dataset.idx;
-  const field = e.target.dataset.field;
-  if(!currentEntry[idx]) currentEntry[idx] = {received:"", returned:"", notes:""};
-  currentEntry[idx][field] = e.target.value;
-  updateBadges(idx);
-  document.getElementById("saveStatus").textContent = "فيه تعديلات لسا ما تحفظت";
-}
-
-function updateBadges(idx){
-  const el = document.getElementById("badges-"+idx);
-  if(!el) return;
-  const entry = currentEntry[idx] || {};
-  const received = entry.received === "" ? "" : Number(entry.received);
-  const returned = entry.returned === "" ? "" : Number(entry.returned);
-  const avg = historicalAvg[idx];
-  const st1 = computeStatus(received, avg);
-  const st2 = computeReturnStatus(received, returned);
-  let html = "";
-  if(avg !== undefined) html += `<span class="badge neutral">متوسط سابق: ${Math.round(avg)} جم</span>`;
-  if(st1.text) html += `<span class="badge ${st1.cls}">${st1.text}</span>`;
-  if(st2.text) html += `<span class="badge ${st2.cls}">${st2.text}</span>`;
-  el.innerHTML = html;
-}
-
-async function loadEntryDay(dateStr){
-  document.getElementById("entryView").innerHTML = '<div class="loader">جاري التحميل…</div>';
-  currentEntry = {};
-  try{
-    const res = await window.storage.get("day:"+dateStr, true);
-    if(res && res.value){
-      const data = JSON.parse(res.value);
-      currentEntry = data.items || {};
-    }
-  }catch(e){ /* لا يوجد بيانات محفوظة لهذا اليوم بعد */ }
-
-  historicalAvg = await loadHistoricalAverages(dateStr);
-  renderEntryView();
-
-  const hasData = Object.keys(currentEntry).length > 0;
-  document.getElementById("saveStatus").textContent = hasData
-    ? "تم تحميل بيانات محفوظة لهذا اليوم — عدّل واحفظ لو احتجت"
-    : "لسا ما تحفظ شي لهذا اليوم";
-}
-
-document.getElementById("dateInput").addEventListener("change", (e)=>{
-  currentDate = e.target.value;
-  loadEntryDay(currentDate);
-});
-
-document.getElementById("saveBtn").addEventListener("click", async ()=>{
-  const payload = { date: currentDate, items: currentEntry };
-  try{
-    await window.storage.set("day:"+currentDate, JSON.stringify(payload), true);
-    document.getElementById("saveStatus").textContent = "✅ تم الحفظ الساعة " + new Date().toLocaleTimeString("ar-SA",{hour:"2-digit",minute:"2-digit"});
-    showToast("تم حفظ بيانات اليوم بنجاح");
-  }catch(e){
-    showToast("⚠ صار خطأ بالحفظ، جرب مرة ثانية");
-    console.error(e);
-  }
-});
-
-// ==================== التقرير الشهري ====================
-document.getElementById("monthInput").addEventListener("change", (e)=>{
-  currentMonth = e.target.value;
-  loadReport();
-});
-
-async function loadReport(){
-  const view = document.getElementById("reportView");
-  view.innerHTML = '<div class="loader">جاري تجميع التقرير…</div>';
-
-  const totals = {}; // idx -> {recv, ret, count}
-  MASTER_ITEMS.forEach((_,idx)=> totals[idx] = {recv:0, ret:0, count:0});
-
-  try{
-    const list = await window.storage.list("day:", true);
-    if(list && list.keys){
-      const monthKeys = list.keys.filter(k => k.replace("day:","").startsWith(currentMonth));
-      for(const key of monthKeys){
-        try{
-          const res = await window.storage.get(key, true);
-          if(!res || !res.value) continue;
-          const data = JSON.parse(res.value);
-          if(!data.items) continue;
-          Object.keys(data.items).forEach(idx=>{
-            const it = data.items[idx];
-            const rec = Number(it.received);
-            const ret = Number(it.returned);
-            if(!isNaN(rec) && it.received !== "" && it.received != null){
-              totals[idx].recv += rec;
-              totals[idx].count += 1;
-            }
-            if(!isNaN(ret) && it.returned !== "" && it.returned != null){
-              totals[idx].ret += ret;
-            }
-          });
-        }catch(e){}
-      }
-    }
-  }catch(e){ console.error(e); }
-
-  view.innerHTML = "";
-
-  let flaggedCount = 0;
-  let lastCat = null;
-  const cards = [];
-
-  MASTER_ITEMS.forEach((item, idx)=>{
-    const t = totals[idx];
-    const avgDaily = t.count > 0 ? t.recv / t.count : null;
-    const retPct = t.recv > 0 ? t.ret / t.recv : null;
-    const flagged = retPct !== null && retPct >= RETURN_THRESHOLD;
-    if(flagged) flaggedCount++;
-
-    if(t.count === 0 && t.ret === 0) return; // ما فيه بيانات لهذا الصنف بالشهر، تخطاه
-
-    if(item.cat !== lastCat){
-      cards.push(`<div class="cat-title">${item.cat}</div>`);
-      lastCat = item.cat;
-    }
-
-    cards.push(`
-      <div class="report-card">
-        <div class="top-row">
-          <div class="name">${item.name}</div>
-          <div class="cat">${item.unit}</div>
-        </div>
-        <div class="stat-grid">
-          <div class="stat"><div class="v">${Math.round(t.recv)}</div><div class="l">إجمالي مستلم (جم)</div></div>
-          <div class="stat"><div class="v">${Math.round(t.ret)}</div><div class="l">إجمالي مرتجع (جم)</div></div>
-          <div class="stat"><div class="v">${avgDaily?Math.round(avgDaily):"—"}</div><div class="l">متوسط يومي (جم)</div></div>
-        </div>
-        <div class="badges">
-          ${retPct!==null ? `<span class="badge ${flagged?'warn':'ok'}">${flagged?'⚠ ':''}نسبة إرجاع ${Math.round(retPct*100)}%</span>` : ""}
-        </div>
-      </div>
-    `);
-  });
-
-  const summary = `
-    <div class="summary-banner">
-      <div class="lbl">عدد الأصناف بنسبة إرجاع مرتفعة هذا الشهر (هدر محتمل)</div>
-      <div class="big">${flaggedCount}</div>
-    </div>
-  `;
-
-  view.innerHTML = cards.length ? (summary + cards.join("")) :
-    '<div class="empty-state">مافي بيانات محفوظة لهذا الشهر بعد.<br>ابدأ بتعبئة تاب "إدخال اليوم".</div>';
-}
-
-// ==================== بدء التشغيل ====================
-loadEntryDay(currentDate);
-</script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/sync.js"></script>
+<script src="js/entry.js"></script>
+<script src="js/items.js"></script>
+<script src="js/tomorrow.js"></script>
+<script src="js/report.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/main.js"></script>
 
 </body>
 </html>
