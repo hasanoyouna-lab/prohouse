@@ -1,12 +1,31 @@
 // ==================== شاشة طلبية الغد ====================
+// ملاحظة: هاي الشاشة تعرض كل الأصناف دايماً بغض النظر عن فلترة الفروع (الفلترة تخص شاشة الاستلام بس)
 
 let currentTomorrowDate = addDaysStr(todayStr(), 1);
 let currentTomorrowOrder = {}; // itemId -> {qty, notes}
+let currentTomorrowBranch = "";
 
 function renderTomorrowView() {
   const view = document.getElementById("tomorrowView");
   if (!view) return;
   view.innerHTML = "";
+
+  const branchCard = document.createElement("div");
+  branchCard.className = "item-card";
+  branchCard.innerHTML = `
+    <div class="inputs-row">
+      <div class="field">
+        <label>الفرع</label>
+        <select id="tomorrowBranchSelect">${branchOptionsHtml(currentTomorrowBranch)}</select>
+      </div>
+    </div>
+  `;
+  view.appendChild(branchCard);
+  document.getElementById("tomorrowBranchSelect").addEventListener("change", (e) => {
+    currentTomorrowBranch = e.target.value;
+    Branch.set(currentTomorrowBranch);
+    loadTomorrowOrder(currentTomorrowDate);
+  });
 
   if (!Items.current.length) {
     view.insertAdjacentHTML("beforeend", '<div class="empty-state">لا يوجد أصناف بعد. ضيف أصناف من تاب "إدارة الأصناف"، أو تأكد إن الباك اند مربوط (js/config.js).</div>');
@@ -52,18 +71,28 @@ function renderTomorrowView() {
 }
 
 async function loadTomorrowOrder(dateStr) {
-  document.getElementById("tomorrowView").innerHTML = '<div class="loader">جاري التحميل…</div>';
-  currentTomorrowOrder = {};
+  currentTomorrowBranch = Branch.get();
   await Items.load();
 
-  const data = await Sync.get("getTomorrowOrder", { date: dateStr }, "tomorrow:" + dateStr, applyTomorrowData);
+  if (!currentTomorrowBranch) {
+    currentTomorrowOrder = {};
+    renderTomorrowView();
+    document.getElementById("tomorrowStatus").textContent = "اختر الفرع أولاً";
+    return;
+  }
+
+  document.getElementById("tomorrowView").innerHTML = '<div class="loader">جاري التحميل…</div>';
+  currentTomorrowOrder = {};
+
+  const cacheKey = "tomorrow:" + dateStr + ":" + currentTomorrowBranch;
+  const data = await Sync.get("getTomorrowOrder", { date: dateStr, branch: currentTomorrowBranch }, cacheKey, applyTomorrowData);
   applyTomorrowData(data);
 
   renderTomorrowView();
   const hasData = Object.keys(currentTomorrowOrder).length > 0;
   document.getElementById("tomorrowStatus").textContent = hasData
-    ? "تم تحميل طلبية محفوظة لهذا اليوم"
-    : "لسا ما فيه طلبية محفوظة لهذا اليوم";
+    ? "تم تحميل طلبية محفوظة لهذا اليوم لهذا الفرع"
+    : "لسا ما فيه طلبية محفوظة لهذا اليوم لهذا الفرع";
 }
 
 function applyTomorrowData(list) {
@@ -82,16 +111,17 @@ function initTomorrowTab() {
   });
 
   document.getElementById("tomorrowSaveBtn").addEventListener("click", () => {
+    if (!currentTomorrowBranch) { showToast("اختر الفرع أولاً"); return; }
     const employeeName = Employee.get();
-    if (!employeeName) { showToast("اختر اسم الموظف من تاب إدخال اليوم أولاً"); return; }
+    if (!employeeName) { showToast("اختر اسم الموظف من تاب طلبية اليوم أولاً"); return; }
 
     const items = Items.current
       .filter(it => currentTomorrowOrder[it.id] && currentTomorrowOrder[it.id].qty !== "")
       .map(it => ({ itemId: it.id, itemName: it.name, unit: it.unit, qty: currentTomorrowOrder[it.id].qty, notes: currentTomorrowOrder[it.id].notes || "" }));
 
-    const payload = { date: currentTomorrowDate, employeeName, items };
-    Sync.enqueue("saveTomorrowOrder:" + currentTomorrowDate, "saveTomorrowOrder", payload);
-    Sync.cacheSet("tomorrow:" + currentTomorrowDate, items);
+    const payload = { date: currentTomorrowDate, branch: currentTomorrowBranch, employeeName, items };
+    Sync.enqueue("saveTomorrowOrder:" + currentTomorrowDate + ":" + currentTomorrowBranch, "saveTomorrowOrder", payload);
+    Sync.cacheSet("tomorrow:" + currentTomorrowDate + ":" + currentTomorrowBranch, items);
     document.getElementById("tomorrowStatus").textContent = "✅ محفوظ محلياً — بتتزامن " + new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
     showToast("تم حفظ طلبية الغد");
   });

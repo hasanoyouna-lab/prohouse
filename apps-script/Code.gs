@@ -1,10 +1,10 @@
 /**
  * Pro House — Apps Script backend.
  * Bind this script to the Google Sheet that has these tabs (header row = row 1):
- *   Items:          id, category, name, unit, hasCustomName, active, sortOrder, updatedAt
- *   DailyEntries:   date, itemId, itemName, unit, received, returned, cookName, notes, savedAt
- *   DayMeta:        date, employeeName, salesReportLink, paymentsReportLink, savedAt, updatedAt
- *   TomorrowOrders: date, itemId, itemName, unit, qty, notes, employeeName, savedAt
+ *   Items:          id, category, name, unit, hasCustomName, branches, active, sortOrder, updatedAt
+ *   DailyEntries:   date, branch, itemId, itemName, unit, confirmed, received, returned, cookName, notes, savedAt
+ *   DayMeta:        date, branch, employeeName, salesReportLink, paymentsReportLink, savedAt, updatedAt
+ *   TomorrowOrders: date, branch, itemId, itemName, unit, qty, notes, employeeName, savedAt
  *   Employees:      name, active
  *   Settings:       key, value
  *
@@ -23,13 +23,15 @@ var SHEET_NAMES = {
 };
 
 var SHEET_HEADERS = {
-  Items: ['id', 'category', 'name', 'unit', 'hasCustomName', 'active', 'sortOrder', 'updatedAt'],
-  DailyEntries: ['date', 'itemId', 'itemName', 'unit', 'received', 'returned', 'cookName', 'notes', 'savedAt'],
-  DayMeta: ['date', 'employeeName', 'salesReportLink', 'paymentsReportLink', 'savedAt', 'updatedAt'],
-  TomorrowOrders: ['date', 'itemId', 'itemName', 'unit', 'qty', 'notes', 'employeeName', 'savedAt'],
+  Items: ['id', 'category', 'name', 'unit', 'hasCustomName', 'branches', 'active', 'sortOrder', 'updatedAt'],
+  DailyEntries: ['date', 'branch', 'itemId', 'itemName', 'unit', 'confirmed', 'received', 'returned', 'cookName', 'notes', 'savedAt'],
+  DayMeta: ['date', 'branch', 'employeeName', 'salesReportLink', 'paymentsReportLink', 'savedAt', 'updatedAt'],
+  TomorrowOrders: ['date', 'branch', 'itemId', 'itemName', 'unit', 'qty', 'notes', 'employeeName', 'savedAt'],
   Employees: ['name', 'active'],
   Settings: ['key', 'value', 'updatedAt']
 };
+
+var DEFAULT_BRANCHES = 'الروضة,الشاطئ,عبداللطيف جميل';
 
 /**
  * شغّل هاي الدالة مرة وحدة بس (▶ Run فوق، اختارها من القائمة، وافق على الصلاحيات).
@@ -44,12 +46,11 @@ function setupEverything() {
     var sh = ss.getSheetByName(name);
     if (!sh) sh = ss.insertSheet(name);
     var headers = SHEET_HEADERS[name];
-    var firstRow = sh.getRange(1, 1, 1, headers.length).getValues()[0];
-    if (firstRow.join('') === '') {
-      sh.getRange(1, 1, 1, headers.length).setValues([headers]);
-      var dateCol = headers.indexOf('date');
-      if (dateCol >= 0) sh.getRange(2, dateCol + 1, 1000, 1).setNumberFormat('@');
-    }
+    // نكتب صف العناوين دايماً (حتى لو الشيت مش فاضي) — كتابة العناوين آمنة 100% وما بتلمس صفوف البيانات (تبلش من صف 2)،
+    // وهيك بتصلح لحالها أي عناوين مكتوبة غلط يدوياً قبل هيك.
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+    var dateCol = headers.indexOf('date');
+    if (dateCol >= 0) sh.getRange(2, dateCol + 1, 2000, 1).setNumberFormat('@');
   });
 
   // احذف تبويب "Sheet1" الفاضي الافتراضي إذا ما زال موجود وما فيه بيانات
@@ -59,7 +60,15 @@ function setupEverything() {
   }
 
   seedInitialDataIfEmpty();
+  ensureDefaultSetting('branches', DEFAULT_BRANCHES);
   return 'تم إعداد كل التبويبات بنجاح';
+}
+
+// يضيف إعداد افتراضي بس إذا كان مش موجود أصلاً (ما بيلمس قيمة موجودة سابقاً حتى لو تغيّرت يدوياً)
+function ensureDefaultSetting(key, defaultValue) {
+  var r = readRows(SHEET_NAMES.SETTINGS);
+  var exists = r.rows.some(function (row) { return row.key === key; });
+  if (!exists) appendRow(SHEET_NAMES.SETTINGS, { key: key, value: defaultValue, updatedAt: nowIso() });
 }
 
 function seedInitialDataIfEmpty() {
@@ -99,9 +108,10 @@ function seedInitialDataIfEmpty() {
     ];
     var now = nowIso();
     var rows = items.map(function (it) {
-      return [Utilities.getUuid(), it[0], it[1], it[2], it[3], true, it[4], now];
+      // id, category, name, unit, hasCustomName, branches('' = كل الفروع), active, sortOrder, updatedAt
+      return [Utilities.getUuid(), it[0], it[1], it[2], it[3], '', true, it[4], now];
     });
-    itemsSheet.getRange(2, 1, rows.length, 8).setValues(rows);
+    itemsSheet.getRange(2, 1, rows.length, 9).setValues(rows);
   }
 
   var employeesSheet = sheet(SHEET_NAMES.EMPLOYEES);
@@ -119,7 +129,8 @@ function seedInitialDataIfEmpty() {
       ['logoUrl', '', now2],
       ['shortageThresholdPct', -0.20, now2],
       ['surplusThresholdPct', 0.25, now2],
-      ['returnThresholdPct', 0.30, now2]
+      ['returnThresholdPct', 0.30, now2],
+      ['branches', DEFAULT_BRANCHES, now2]
     ];
     settingsSheet.getRange(2, 1, settings.length, 3).setValues(settings);
   }
@@ -131,9 +142,9 @@ function doGet(e) {
     var data;
     switch (action) {
       case 'getItems': data = getItems(e.parameter.all === '1'); break;
-      case 'getDay': data = getDay(e.parameter.date); break;
+      case 'getDay': data = getDay(e.parameter.date, e.parameter.branch); break;
       case 'getReport': data = getReport(e.parameter.start, e.parameter.end); break;
-      case 'getTomorrowOrder': data = getTomorrowOrder(e.parameter.date); break;
+      case 'getTomorrowOrder': data = getTomorrowOrder(e.parameter.date, e.parameter.branch); break;
       case 'getEmployees': data = getEmployees(); break;
       case 'getSettings': data = getSettings(); break;
       case 'backupAll': data = backupAll(); break;
@@ -235,7 +246,7 @@ function saveItem(p) {
   if (isNew) {
     appendRow(SHEET_NAMES.ITEMS, {
       id: p.id, category: p.category, name: p.name, unit: p.unit,
-      hasCustomName: !!p.hasCustomName, active: true,
+      hasCustomName: !!p.hasCustomName, branches: p.branches || '', active: true,
       sortOrder: p.sortOrder || 0, updatedAt: p.updatedAt
     });
   } else {
@@ -270,28 +281,28 @@ function deleteItem(p) {
 
 // ==================== Daily entries / day meta ====================
 
-function getDay(date) {
-  var entries = readRows(SHEET_NAMES.DAILY).rows.filter(function (r) { return r.date === date; });
-  var metaRows = readRows(SHEET_NAMES.DAYMETA).rows.filter(function (r) { return r.date === date; });
-  return { date: date, meta: metaRows[0] || null, items: entries };
+function getDay(date, branch) {
+  var entries = readRows(SHEET_NAMES.DAILY).rows.filter(function (r) { return r.date === date && r.branch === branch; });
+  var metaRows = readRows(SHEET_NAMES.DAYMETA).rows.filter(function (r) { return r.date === date && r.branch === branch; });
+  return { date: date, branch: branch, meta: metaRows[0] || null, items: entries };
 }
 
 function saveDay(p) {
-  // full replace for this date
-  deleteRowsWhere(SHEET_NAMES.DAILY, function (row) { return row.date === p.date; });
+  // full replace لنفس التاريخ + نفس الفرع فقط (كل فرع مستقل، ما بيمسح فروع تانية بنفس اليوم)
+  deleteRowsWhere(SHEET_NAMES.DAILY, function (row) { return row.date === p.date && row.branch === p.branch; });
   var savedAt = nowIso();
   (p.items || []).forEach(function (it) {
     appendRow(SHEET_NAMES.DAILY, {
-      date: p.date, itemId: it.itemId, itemName: it.itemName, unit: it.unit,
-      received: it.received, returned: it.returned, cookName: it.cookName || '',
+      date: p.date, branch: p.branch, itemId: it.itemId, itemName: it.itemName, unit: it.unit,
+      confirmed: !!it.confirmed, received: it.received, returned: it.returned, cookName: it.cookName || '',
       notes: it.notes || '', savedAt: savedAt
     });
   });
 
   var metaRows = readRows(SHEET_NAMES.DAYMETA);
-  var existing = metaRows.rows.filter(function (r) { return r.date === p.date; })[0];
+  var existing = metaRows.rows.filter(function (r) { return r.date === p.date && r.branch === p.branch; })[0];
   var metaObj = {
-    date: p.date, employeeName: p.employeeName || '',
+    date: p.date, branch: p.branch, employeeName: p.employeeName || '',
     salesReportLink: p.salesReportLink || '', paymentsReportLink: p.paymentsReportLink || '',
     savedAt: existing ? existing.savedAt : savedAt, updatedAt: savedAt
   };
@@ -302,7 +313,7 @@ function saveDay(p) {
   } else {
     appendRow(SHEET_NAMES.DAYMETA, metaObj);
   }
-  return { date: p.date, savedAt: savedAt };
+  return { date: p.date, branch: p.branch, savedAt: savedAt };
 }
 
 function getReport(start, end) {
@@ -312,14 +323,19 @@ function getReport(start, end) {
   var allEntries = readRows(SHEET_NAMES.DAILY).rows.filter(function (r) { return r.date >= start && r.date <= end; });
   var allMeta = readRows(SHEET_NAMES.DAYMETA).rows.filter(function (r) { return r.date >= start && r.date <= end; });
 
-  var byDate = {};
+  // نجمع حسب (التاريخ + الفرع) — كل فرع بيوم معين سجل مستقل بروابطه وموظفه الخاص،
+  // بينما الإجمالي (totals تحت) بيضم كل الفروع مع بعض بتقرير واحد للشيف.
+  var byDateBranch = {};
   allEntries.forEach(function (r) {
-    if (!byDate[r.date]) byDate[r.date] = [];
-    byDate[r.date].push(r);
+    var key = r.date + '||' + r.branch;
+    if (!byDateBranch[key]) byDateBranch[key] = [];
+    byDateBranch[key].push(r);
   });
-  var days = Object.keys(byDate).sort().map(function (date) {
-    var meta = allMeta.filter(function (m) { return m.date === date; })[0] || null;
-    return { date: date, meta: meta, items: byDate[date] };
+  var days = Object.keys(byDateBranch).sort().map(function (key) {
+    var parts = key.split('||');
+    var date = parts[0], branch = parts[1];
+    var meta = allMeta.filter(function (m) { return m.date === date && m.branch === branch; })[0] || null;
+    return { date: date, branch: branch, meta: meta, items: byDateBranch[key] };
   });
 
   var totalsMap = {};
@@ -346,20 +362,20 @@ function getReport(start, end) {
 
 // ==================== Tomorrow orders ====================
 
-function getTomorrowOrder(date) {
-  return readRows(SHEET_NAMES.TOMORROW).rows.filter(function (r) { return r.date === date; });
+function getTomorrowOrder(date, branch) {
+  return readRows(SHEET_NAMES.TOMORROW).rows.filter(function (r) { return r.date === date && r.branch === branch; });
 }
 
 function saveTomorrowOrder(p) {
-  deleteRowsWhere(SHEET_NAMES.TOMORROW, function (row) { return row.date === p.date; });
+  deleteRowsWhere(SHEET_NAMES.TOMORROW, function (row) { return row.date === p.date && row.branch === p.branch; });
   var savedAt = nowIso();
   (p.items || []).forEach(function (it) {
     appendRow(SHEET_NAMES.TOMORROW, {
-      date: p.date, itemId: it.itemId, itemName: it.itemName, unit: it.unit,
+      date: p.date, branch: p.branch, itemId: it.itemId, itemName: it.itemName, unit: it.unit,
       qty: it.qty, notes: it.notes || '', employeeName: p.employeeName || '', savedAt: savedAt
     });
   });
-  return { date: p.date, savedAt: savedAt };
+  return { date: p.date, branch: p.branch, savedAt: savedAt };
 }
 
 // ==================== Employees / Settings ====================

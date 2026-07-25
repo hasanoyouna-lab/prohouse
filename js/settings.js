@@ -13,9 +13,6 @@ function applyBrandingFromSettings() {
   if (currentSettings.restaurantName) {
     document.querySelectorAll(".brand-name").forEach(el => el.textContent = currentSettings.restaurantName);
   }
-  if (currentSettings.branchName) {
-    document.querySelectorAll(".brand-branch").forEach(el => el.textContent = currentSettings.branchName);
-  }
   if (currentSettings.logoUrl) {
     const img = document.getElementById("headerLogoImg");
     if (img) { img.src = currentSettings.logoUrl; img.classList.remove("hidden"); }
@@ -31,9 +28,17 @@ function renderSettingsView() {
     <div class="settings-card">
       <h3>هوية المطعم</h3>
       <div class="field"><label>اسم النظام/المطعم</label><input type="text" id="setRestaurantName" value="${currentSettings.restaurantName || "Pro House"}"></div>
-      <div class="field"><label>اسم الفرع</label><input type="text" id="setBranchName" value="${currentSettings.branchName || ""}"></div>
       <div class="field"><label>رابط صورة الشعار (اختياري)</label><input type="url" id="setLogoUrl" value="${currentSettings.logoUrl || ""}"></div>
       <button class="btn gold" id="saveBrandBtn">حفظ</button>
+    </div>
+
+    <div class="settings-card">
+      <h3>الفروع</h3>
+      <div class="field">
+        <label>أسماء الفروع (افصل بينها بفاصلة ,)</label>
+        <input type="text" id="setBranches" value="${currentSettings.branches || DEFAULT_BRANCHES_FALLBACK}">
+      </div>
+      <button class="btn gold" id="saveBranchesBtn">حفظ الفروع</button>
     </div>
 
     <div class="settings-card">
@@ -67,7 +72,6 @@ function renderSettingsView() {
   document.getElementById("saveBrandBtn").addEventListener("click", () => {
     const payload = {
       restaurantName: document.getElementById("setRestaurantName").value.trim(),
-      branchName: document.getElementById("setBranchName").value.trim(),
       logoUrl: document.getElementById("setLogoUrl").value.trim()
     };
     currentSettings = { ...currentSettings, ...payload };
@@ -75,6 +79,14 @@ function renderSettingsView() {
     Sync.enqueue("saveSettings:brand", "saveSettings", payload);
     applyBrandingFromSettings();
     showToast("تم حفظ الهوية");
+  });
+
+  document.getElementById("saveBranchesBtn").addEventListener("click", () => {
+    const payload = { branches: document.getElementById("setBranches").value.trim() };
+    currentSettings = { ...currentSettings, ...payload };
+    Sync.cacheSet("settings", currentSettings);
+    Sync.enqueue("saveSettings:branches", "saveSettings", payload);
+    showToast("تم حفظ الفروع");
   });
 
   document.getElementById("saveThresholdsBtn").addEventListener("click", () => {

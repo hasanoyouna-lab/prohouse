@@ -78,15 +78,41 @@ function renderReport(data) {
 
   const summary = `
     <div class="summary-banner">
-      <div class="lbl">عدد الأصناف بنسبة إرجاع مرتفعة بهذه الفترة (هدر محتمل)</div>
+      <div class="lbl">عدد الأصناف بنسبة إرجاع مرتفعة بهذه الفترة (هدر محتمل) — كل الفروع مجتمعة</div>
       <div class="big">${data.flaggedCount}</div>
     </div>
   `;
 
+  // ملخص سريع لكل فرع لحاله (فوق التقرير الموحّد)
+  const branchStats = branchList().map(b => {
+    const branchDays = data.days.filter(d => d.branch === b);
+    let recv = 0, ret = 0;
+    branchDays.forEach(d => (d.items || []).forEach(it => {
+      const r = Number(it.received), rt = Number(it.returned);
+      if (!isNaN(r)) recv += r;
+      if (!isNaN(rt)) ret += rt;
+    }));
+    return { branch: b, dayCount: branchDays.length, recv, ret };
+  }).filter(s => s.dayCount > 0);
+
+  const branchStatsBlock = branchStats.length ? `
+    <div class="cat-title">ملخص حسب الفرع</div>
+    ${branchStats.map(s => `
+      <div class="report-card">
+        <div class="top-row"><div class="name">${s.branch}</div></div>
+        <div class="stat-grid">
+          <div class="stat"><div class="v">${s.dayCount}</div><div class="l">أيام مسجلة</div></div>
+          <div class="stat"><div class="v">${Math.round(s.recv)}</div><div class="l">إجمالي مستلم (جم)</div></div>
+          <div class="stat"><div class="v">${Math.round(s.ret)}</div><div class="l">إجمالي مرتجع (جم)</div></div>
+        </div>
+      </div>
+    `).join("")}
+  ` : "";
+
   const dayLinks = data.days.map(d => {
     const links = [];
-    if (d.meta && d.meta.salesReportLink) links.push(`<a href="${d.meta.salesReportLink}" target="_blank" rel="noopener">📈 مبيعات ${d.date}</a>`);
-    if (d.meta && d.meta.paymentsReportLink) links.push(`<a href="${d.meta.paymentsReportLink}" target="_blank" rel="noopener">💳 مدفوعات ${d.date}</a>`);
+    if (d.meta && d.meta.salesReportLink) links.push(`<a href="${d.meta.salesReportLink}" target="_blank" rel="noopener">📈 مبيعات ${d.branch} — ${d.date}</a>`);
+    if (d.meta && d.meta.paymentsReportLink) links.push(`<a href="${d.meta.paymentsReportLink}" target="_blank" rel="noopener">💳 مدفوعات ${d.branch} — ${d.date}</a>`);
     return links.join("");
   }).filter(Boolean).join("");
 
