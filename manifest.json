@@ -1,0 +1,11 @@
+{
+  "name": "Pro House — استلام وإرجاع الأصناف",
+  "short_name": "Pro House",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0B0B0C",
+  "theme_color": "#0B0B0C",
+  "lang": "ar",
+  "dir": "rtl"
+}

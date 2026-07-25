@@ -49,6 +49,11 @@ function updateOfflineBanner() {
 window.addEventListener("online", updateOfflineBanner);
 window.addEventListener("offline", updateOfflineBanner);
 
+// ---- تسجيل Service Worker (يخلي التطبيق نفسه يفتح بدون إنترنت) ----
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  navigator.serviceWorker.register("sw.js").catch((e) => console.warn("SW register failed:", e));
+}
+
 // ---- الإقلاع ----
 updateOfflineBanner();
 updateSyncBadge({ pending: Sync.getQueue().length });
