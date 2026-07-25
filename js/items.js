@@ -2,17 +2,23 @@
 
 const Items = (() => {
   let current = [];
+  let loadingPromise = null;
 
   function isActive(it) { return it.active !== false && it.active !== "FALSE"; }
 
   async function load() {
-    const data = await Sync.get("getItems", { all: "1" }, "items", (val) => {
-      current = (val || []).filter(isActive);
+    if (loadingPromise) return loadingPromise; // يتفادى نداءات متزامنة مكررة (تنادى من إدخال اليوم/طلبية الغد/إدارة الأصناف بنفس الوقت)
+    loadingPromise = (async () => {
+      const data = await Sync.get("getItems", { all: "1" }, "items", (val) => {
+        current = (val || []).filter(isActive);
+        renderIfActive();
+      });
+      if (data) current = data.filter(isActive);
       renderIfActive();
-    });
-    if (data) current = data.filter(isActive);
-    renderIfActive();
-    return current;
+      return current;
+    })();
+    try { return await loadingPromise; }
+    finally { loadingPromise = null; }
   }
 
   function byId(id) { return current.find(it => it.id === id); }

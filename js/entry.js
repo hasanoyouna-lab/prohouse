@@ -1,8 +1,15 @@
 // ==================== شاشة إدخال اليوم (استلام / إرجاع) ====================
 
-const SHORTAGE_THRESHOLD = -0.20;
-const SURPLUS_THRESHOLD  = 0.25;
-const RETURN_THRESHOLD   = 0.30;
+const SHORTAGE_THRESHOLD_DEFAULT = -0.20;
+const SURPLUS_THRESHOLD_DEFAULT  = 0.25;
+const RETURN_THRESHOLD_DEFAULT   = 0.30;
+
+// تُقرأ من شاشة الإعدادات (currentSettings مُعرّفة بـ js/settings.js) إن كانت محفوظة، وإلا القيم الافتراضية فوق.
+function thresholdFrom(key, fallback) {
+  const v = (typeof currentSettings !== "undefined" && currentSettings[key] !== undefined && currentSettings[key] !== "")
+    ? Number(currentSettings[key]) : NaN;
+  return isNaN(v) ? fallback : v;
+}
 
 function todayStr() {
   const d = new Date();
@@ -38,15 +45,18 @@ function computeStatus(received, avg) {
   if (avg === undefined || avg === null || isNaN(avg)) return { text: "لا يوجد سابق", cls: "neutral" };
   if (received === "" || received === null || isNaN(received)) return { text: "", cls: "neutral" };
   const diff = (received - avg) / avg;
-  if (diff <= SHORTAGE_THRESHOLD) return { text: "⚠ نقص واضح (" + Math.round(diff * 100) + "%)", cls: "warn" };
-  if (diff >= SURPLUS_THRESHOLD) return { text: "⚠ زيادة غير معتادة (+" + Math.round(diff * 100) + "%)", cls: "warn" };
+  const shortage = thresholdFrom("shortageThresholdPct", SHORTAGE_THRESHOLD_DEFAULT);
+  const surplus = thresholdFrom("surplusThresholdPct", SURPLUS_THRESHOLD_DEFAULT);
+  if (diff <= shortage) return { text: "⚠ نقص واضح (" + Math.round(diff * 100) + "%)", cls: "warn" };
+  if (diff >= surplus) return { text: "⚠ زيادة غير معتادة (+" + Math.round(diff * 100) + "%)", cls: "warn" };
   return { text: "طبيعي", cls: "ok" };
 }
 function computeReturnStatus(received, returned) {
   if (received === "" || received === null || isNaN(received) || Number(received) === 0) return { text: "", cls: "neutral" };
   if (returned === "" || returned === null || isNaN(returned)) return { text: "", cls: "neutral" };
   const pct = Number(returned) / Number(received);
-  if (pct >= RETURN_THRESHOLD) return { text: "⚠ إرجاع مرتفع " + Math.round(pct * 100) + "% (هدر محتمل)", cls: "warn" };
+  const returnThreshold = thresholdFrom("returnThresholdPct", RETURN_THRESHOLD_DEFAULT);
+  if (pct >= returnThreshold) return { text: "⚠ إرجاع مرتفع " + Math.round(pct * 100) + "% (هدر محتمل)", cls: "warn" };
   return { text: "إرجاع طبيعي " + Math.round(pct * 100) + "%", cls: "ok" };
 }
 

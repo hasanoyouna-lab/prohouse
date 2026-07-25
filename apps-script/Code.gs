@@ -203,6 +203,9 @@ function saveDay(p) {
 }
 
 function getReport(start, end) {
+  var settings = getSettings();
+  var returnThreshold = settings.returnThresholdPct !== undefined && settings.returnThresholdPct !== ''
+    ? Number(settings.returnThresholdPct) : 0.30;
   var allEntries = readRows(SHEET_NAMES.DAILY).rows.filter(function (r) { return r.date >= start && r.date <= end; });
   var allMeta = readRows(SHEET_NAMES.DAYMETA).rows.filter(function (r) { return r.date >= start && r.date <= end; });
 
@@ -230,7 +233,7 @@ function getReport(start, end) {
     var t = totalsMap[id];
     t.avgDaily = t.dayCount > 0 ? t.totalReceived / t.dayCount : null;
     t.returnPct = t.totalReceived > 0 ? t.totalReturned / t.totalReceived : null;
-    t.flagged = t.returnPct !== null && t.returnPct >= 0.30;
+    t.flagged = t.returnPct !== null && t.returnPct >= returnThreshold;
     if (t.flagged) flaggedCount++;
     return t;
   });
