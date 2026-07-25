@@ -243,33 +243,58 @@ document.querySelectorAll(".tab-btn").forEach(btn=>{
 
 // ==================== منطق الإدخال اليومي ====================
 async function loadHistoricalAverages(beforeDate){
-  const result = {};
-  try{
-    const list = await window.storage.list("day:", true);
-    if(!list || !list.keys) return result;
-    const relevantKeys = list.keys.filter(k => k.replace("day:","") < beforeDate);
-    const sums = {}, counts = {};
-    for(const key of relevantKeys){
-      try{
-        const res = await window.storage.get(key, true);
-        if(!res || !res.value) continue;
-        const data = JSON.parse(res.value);
-        if(!data.items) continue;
-        Object.keys(data.items).forEach(idx=>{
-          const rec = Number(data.items[idx].received);
-          if(!isNaN(rec) && data.items[idx].received !== "" && data.items[idx].received != null){
-            sums[idx] = (sums[idx]||0) + rec;
-            counts[idx] = (counts[idx]||0) + 1;
-          }
-        });
-      }catch(e){}
-    }
-    Object.keys(sums).forEach(idx=>{ result[idx] = sums[idx]/counts[idx]; });
-  }catch(e){ console.error(e); }
-  return result;
-}
 
-function computeStatus(received, avg){
+    const result={};
+
+    const sums={};
+
+    const counts={};
+
+    for(let i=0;i<localStorage.length;i++){
+
+        const key=localStorage.key(i);
+
+        if(!key.startsWith("day:")) continue;
+
+        const date=key.replace("day:","");
+
+        if(date>=beforeDate) continue;
+
+        try{
+
+            const data=JSON.parse(localStorage.getItem(key));
+
+            if(!data.items) continue;
+
+            Object.keys(data.items).forEach(idx=>{
+
+                const rec=Number(data.items[idx].received);
+
+                if(!isNaN(rec) && data.items[idx].received!==""){
+
+                    sums[idx]=(sums[idx]||0)+rec;
+
+                    counts[idx]=(counts[idx]||0)+1;
+
+                }
+
+            });
+
+        }
+
+        catch(e){}
+
+    }
+
+    Object.keys(sums).forEach(idx=>{
+
+        result[idx]=sums[idx]/counts[idx];
+
+    });
+
+    return result;
+
+}(received, avg){
   if(avg === undefined || avg === null || isNaN(avg)) return {text:"لا يوجد سابق", cls:"neutral"};
   if(received === "" || received === null || isNaN(received)) return {text:"", cls:"neutral"};
   const diff = (received - avg) / avg;
@@ -353,7 +378,42 @@ function updateBadges(idx){
 }
 
 async function loadEntryDay(dateStr){
-  document.getElementById("entryView").innerHTML = '<div class="loader">جاري التحميل…</div>';
+
+    document.getElementById("entryView").innerHTML='<div class="loader">جاري التحميل...</div>';
+
+    currentEntry={};
+
+    const raw=localStorage.getItem("day:"+dateStr);
+
+    if(raw){
+
+        try{
+
+            const data=JSON.parse(raw);
+
+            currentEntry=data.items||{};
+
+        }
+
+        catch(e){}
+
+    }
+
+    historicalAvg=await loadHistoricalAverages(dateStr);
+
+    renderEntryView();
+
+    document.getElementById("saveStatus").textContent=
+
+    raw?
+
+    "تم تحميل البيانات"
+
+    :
+
+    "لا يوجد حفظ لهذا اليوم";
+
+}  document.getElementById("entryView").innerHTML = '<div class="loader">جاري التحميل…</div>';
   currentEntry = {};
   try{
     const res = await window.storage.get("day:"+dateStr, true);
@@ -377,7 +437,7 @@ document.getElementById("dateInput").addEventListener("change", (e)=>{
   loadEntryDay(currentDate);
 });
 
-document.getElementById("saveBtn").addEventListener("click", async ()=>{
+document.getElementById("saveBtn").addEventListener("click",()=>{      const payload={          date:currentDate,          items:currentEntry      };      localStorage.setItem(          "day:"+currentDate,          JSON.stringify(payload)      );      document.getElementById("saveStatus").textContent=      "✅ تم الحفظ";      showToast("تم الحفظ بنجاح");  });.addEventListener("click", async ()=>{
   const payload = { date: currentDate, items: currentEntry };
   try{
     await window.storage.set("day:"+currentDate, JSON.stringify(payload), true);
@@ -403,8 +463,43 @@ async function loadReport(){
   MASTER_ITEMS.forEach((_,idx)=> totals[idx] = {recv:0, ret:0, count:0});
 
   try{
-    const list = await window.storage.list("day:", true);
-    if(list && list.keys){
+for(let i=0;i<localStorage.length;i++){
+
+    const key=localStorage.key(i);
+
+    if(!key.startsWith("day:")) continue;
+
+    if(!key.replace("day:","").startsWith(currentMonth)) continue;
+
+    const data=JSON.parse(localStorage.getItem(key));
+
+    if(!data.items) continue;
+
+    Object.keys(data.items).forEach(idx=>{
+
+        const it=data.items[idx];
+
+        const rec=Number(it.received);
+
+        const ret=Number(it.returned);
+
+        if(!isNaN(rec) && it.received!==""){
+
+            totals[idx].recv+=rec;
+
+            totals[idx].count++;
+
+        }
+
+        if(!isNaN(ret) && it.returned!==""){
+
+            totals[idx].ret+=ret;
+
+        }
+
+    });
+
+}    if(list && list.keys){
       const monthKeys = list.keys.filter(k => k.replace("day:","").startsWith(currentMonth));
       for(const key of monthKeys){
         try{
