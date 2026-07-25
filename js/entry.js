@@ -266,9 +266,17 @@ function applyDayData(val) {
 
 // حفظ فوري (بدون انتظار ضغطة زر) — كل قيمة (استلام صباحاً، إرجاع بعد الظهر، أي حقل) تنحفظ لحالها أول ما تتغير
 function saveEntryNow(showStatus) {
-  if (!currentBranch) { if (showStatus) showToast("اختر الفرع أولاً"); return; }
+  if (!currentBranch) {
+    document.getElementById("saveStatus").textContent = "⚠ ما تحفظ — اختر الفرع أولاً";
+    if (showStatus) showToast("اختر الفرع أولاً");
+    return;
+  }
   const employeeName = document.getElementById("employeeSelect").value;
-  if (!employeeName) { if (showStatus) showToast("اختر اسم الموظف قبل الحفظ"); return; }
+  if (!employeeName) {
+    document.getElementById("saveStatus").textContent = "⚠ ما تحفظ — اختر اسم الموظف أولاً";
+    if (showStatus) showToast("اختر اسم الموظف قبل الحفظ");
+    return;
+  }
   Employee.set(employeeName);
   const salesReportLink = document.getElementById("salesLink").value.trim();
   const paymentsReportLink = document.getElementById("paymentsLink").value.trim();
