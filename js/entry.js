@@ -266,18 +266,12 @@ function applyDayData(val) {
 
 // حفظ فوري (بدون انتظار ضغطة زر) — كل قيمة (استلام صباحاً، إرجاع بعد الظهر، أي حقل) تنحفظ لحالها أول ما تتغير
 function saveEntryNow(showStatus) {
-  if (!currentBranch) {
-    document.getElementById("saveStatus").textContent = "⚠ ما تحفظ — اختر الفرع أولاً";
-    if (showStatus) showToast("اختر الفرع أولاً");
-    return;
-  }
+  // نحفظ دايماً حتى لو الفرع أو الموظف لسا ما انحددوا (بيانات ناقصة أحسن من ولا بيانات) —
+  // بس بنحط تنبيه بسيط يفكّر المستخدم يكملهم، بدون ما يمنع الحفظ.
   const employeeName = document.getElementById("employeeSelect").value;
-  if (!employeeName) {
-    document.getElementById("saveStatus").textContent = "⚠ ما تحفظ — اختر اسم الموظف أولاً";
-    if (showStatus) showToast("اختر اسم الموظف قبل الحفظ");
-    return;
-  }
-  Employee.set(employeeName);
+  if (employeeName) Employee.set(employeeName);
+  const branch = currentBranch || "";
+
   const salesReportLink = document.getElementById("salesLink").value.trim();
   const paymentsReportLink = document.getElementById("paymentsLink").value.trim();
 
@@ -290,10 +284,17 @@ function saveEntryNow(showStatus) {
       cookName: currentEntry[it.id].cookName || "", notes: currentEntry[it.id].notes || ""
     }));
 
-  const payload = { date: currentEntryDate, branch: currentBranch, employeeName, salesReportLink, paymentsReportLink, items };
-  Sync.enqueue("saveDay:" + currentEntryDate + ":" + currentBranch, "saveDay", payload);
-  Sync.cacheSet("day:" + currentEntryDate + ":" + currentBranch, { date: currentEntryDate, branch: currentBranch, meta: { employeeName, salesReportLink, paymentsReportLink }, items });
-  document.getElementById("saveStatus").textContent = "✅ محفوظ — بتتزامن " + new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
+  const payload = { date: currentEntryDate, branch, employeeName, salesReportLink, paymentsReportLink, items };
+  Sync.enqueue("saveDay:" + currentEntryDate + ":" + branch, "saveDay", payload);
+  Sync.cacheSet("day:" + currentEntryDate + ":" + branch, { date: currentEntryDate, branch, meta: { employeeName, salesReportLink, paymentsReportLink }, items });
+
+  const missing = [];
+  if (!branch) missing.push("الفرع");
+  if (!employeeName) missing.push("الموظف");
+  const savedAtText = new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
+  document.getElementById("saveStatus").textContent = missing.length
+    ? `✅ محفوظ (بدون ${missing.join(" و")} — كمّلهم أول ما تقدر) — ${savedAtText}`
+    : "✅ محفوظ — بتتزامن " + savedAtText;
   if (showStatus) showToast("تم حفظ بيانات اليوم");
 }
 
