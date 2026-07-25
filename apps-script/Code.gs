@@ -22,6 +22,109 @@ var SHEET_NAMES = {
   SETTINGS: 'Settings'
 };
 
+var SHEET_HEADERS = {
+  Items: ['id', 'category', 'name', 'unit', 'hasCustomName', 'active', 'sortOrder', 'updatedAt'],
+  DailyEntries: ['date', 'itemId', 'itemName', 'unit', 'received', 'returned', 'cookName', 'notes', 'savedAt'],
+  DayMeta: ['date', 'employeeName', 'salesReportLink', 'paymentsReportLink', 'savedAt', 'updatedAt'],
+  TomorrowOrders: ['date', 'itemId', 'itemName', 'unit', 'qty', 'notes', 'employeeName', 'savedAt'],
+  Employees: ['name', 'active'],
+  Settings: ['key', 'value', 'updatedAt']
+};
+
+/**
+ * شغّل هاي الدالة مرة وحدة بس (▶ Run فوق، اختارها من القائمة، وافق على الصلاحيات).
+ * بتنشئ كل التبويبات المطلوبة تلقائياً بأسماء وأعمدة صحيحة، وبتعبي بيانات أولية
+ * (30 صنف، 7 موظفين placeholder، إعدادات افتراضية) — ما بتحتاج تسوي شي يدوي بالشيت أبداً.
+ * ممكن تشغّلها أكثر من مرة بأمان: ما بتكرر التبويبات ولا البيانات إذا كانت موجودة أصلاً.
+ */
+function setupEverything() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  Object.keys(SHEET_HEADERS).forEach(function (name) {
+    var sh = ss.getSheetByName(name);
+    if (!sh) sh = ss.insertSheet(name);
+    var headers = SHEET_HEADERS[name];
+    var firstRow = sh.getRange(1, 1, 1, headers.length).getValues()[0];
+    if (firstRow.join('') === '') {
+      sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+      var dateCol = headers.indexOf('date');
+      if (dateCol >= 0) sh.getRange(2, dateCol + 1, 1000, 1).setNumberFormat('@');
+    }
+  });
+
+  // احذف تبويب "Sheet1" الفاضي الافتراضي إذا ما زال موجود وما فيه بيانات
+  var defaultSheet = ss.getSheetByName('Sheet1');
+  if (defaultSheet && ss.getSheets().length > 1 && defaultSheet.getLastRow() === 0) {
+    ss.deleteSheet(defaultSheet);
+  }
+
+  seedInitialDataIfEmpty();
+  return 'تم إعداد كل التبويبات بنجاح';
+}
+
+function seedInitialDataIfEmpty() {
+  var itemsSheet = sheet(SHEET_NAMES.ITEMS);
+  if (itemsSheet.getLastRow() < 2) {
+    var items = [
+      ['دجاج', 'دجاج تندر', '1/3', false, 1],
+      ['دجاج', 'دجاج باربكيو', '1/3', false, 2],
+      ['دجاج', 'دجاج بينك صوص', '1/3', false, 3],
+      ['دجاج', 'دجاج الشيف', '1/3', true, 4],
+      ['بحري', 'لحم الشيف', '1/3', true, 1],
+      ['بحري', 'سالمون', '1/3', false, 2],
+      ['بحري', 'سمك الشيف (جمبو)', '1/3', false, 3],
+      ['بحري', 'جمبري بروفنسال', '1/3', false, 4],
+      ['كارب', 'رز أبيض', '1/2', false, 1],
+      ['كارب', 'رز الشيف', '1/2', false, 2],
+      ['كارب', 'بطاطس ويدجز', '1', false, 3],
+      ['كارب', 'مكرونة الشيف', '1/3', false, 4],
+      ['كارب', 'كارب الشيف', '1/3', false, 5],
+      ['السلطات', 'سلطة تونا', 'طاسة', false, 1],
+      ['السلطات', 'سلطة فتوش', 'طاسة', false, 2],
+      ['السلطات', 'سلطة سيزر', 'طاسة', false, 3],
+      ['الحلويات', 'كوكيز', 'حبة', false, 1],
+      ['الحلويات', 'براونيز', 'حبة', false, 2],
+      ['الحلويات', 'سينابون', 'حبة', false, 3],
+      ['الحلويات', 'حلى الشيف', 'صينية', false, 4],
+      ['فطور', 'ساندويتش روستيد', 'ساندويتش', false, 1],
+      ['فطور', 'ساندويتش صن رايز', 'ساندويتش', false, 2],
+      ['فطور', 'صن رايز بدون ديك رومي', 'ساندويتش', false, 3],
+      ['فطور', 'ساندويتش تونا', 'ساندويتش', false, 4],
+      ['فطور', 'ساندويتش كساديا', 'ساندويتش', false, 5],
+      ['فطور', 'ساندويتش كروك ديلوكس', 'ساندويتش', false, 6],
+      ['فطور', 'كرواسون بيض بالتيركي', 'ساندويتش', false, 7],
+      ['فطور', 'ساندويتش حلوم', 'ساندويتش', false, 8],
+      ['فطور', 'كلوب ساندويتش', 'ساندويتش', false, 9],
+      ['معدات', 'سفنديشات الفطور', '-', false, 1]
+    ];
+    var now = nowIso();
+    var rows = items.map(function (it) {
+      return [Utilities.getUuid(), it[0], it[1], it[2], it[3], true, it[4], now];
+    });
+    itemsSheet.getRange(2, 1, rows.length, 8).setValues(rows);
+  }
+
+  var employeesSheet = sheet(SHEET_NAMES.EMPLOYEES);
+  if (employeesSheet.getLastRow() < 2) {
+    var employees = [1, 2, 3, 4, 5, 6, 7].map(function (n) { return ['موظف ' + n, true]; });
+    employeesSheet.getRange(2, 1, employees.length, 2).setValues(employees);
+  }
+
+  var settingsSheet = sheet(SHEET_NAMES.SETTINGS);
+  if (settingsSheet.getLastRow() < 2) {
+    var now2 = nowIso();
+    var settings = [
+      ['restaurantName', 'Pro House', now2],
+      ['branchName', '', now2],
+      ['logoUrl', '', now2],
+      ['shortageThresholdPct', -0.20, now2],
+      ['surplusThresholdPct', 0.25, now2],
+      ['returnThresholdPct', 0.30, now2]
+    ];
+    settingsSheet.getRange(2, 1, settings.length, 3).setValues(settings);
+  }
+}
+
 function doGet(e) {
   try {
     var action = e.parameter.action;
