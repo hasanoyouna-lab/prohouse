@@ -9,7 +9,7 @@ const Items = (() => {
   async function load() {
     if (loadingPromise) return loadingPromise; // يتفادى نداءات متزامنة مكررة (تنادى من إدخال اليوم/طلبية الغد/إدارة الأصناف بنفس الوقت)
     loadingPromise = (async () => {
-      const data = await Sync.get("getItems", { all: "1" }, "items", (val) => {
+      const data = await Sync.get("getItems", { all: "1" }, "items_v2", (val) => {
         current = (val || []).filter(isActive);
         renderIfActive();
       });
@@ -34,14 +34,14 @@ const Items = (() => {
     const idx = current.findIndex(it => it.id === item.id);
     if (idx >= 0) current[idx] = { ...current[idx], ...item };
     else current.push(item);
-    Sync.cacheSet("items", current);
+    Sync.cacheSet("items_v2", current);
     Sync.enqueue("saveItem:" + item.id, "saveItem", item);
     return item;
   }
 
   function remove(id) {
     current = current.filter(it => it.id !== id);
-    Sync.cacheSet("items", current);
+    Sync.cacheSet("items_v2", current);
     Sync.enqueue("deleteItem:" + id, "deleteItem", { id });
   }
 
@@ -67,6 +67,31 @@ function checkedBranches(container) {
   return [...container.querySelectorAll('input[type="checkbox"]:checked')].map(cb => cb.value).join(",");
 }
 
+// قائمة تصنيف منسدلة من التصنيفات الموجودة فعلاً (بدون تكرار) + خيار "تصنيف جديد" لو احتجنا
+function categorySelectHtml(cats, selected) {
+  return `
+    <select data-cat-select>
+      <option value="">اختر تصنيف</option>
+      ${cats.map(c => `<option value="${c}" ${c === selected ? "selected" : ""}>${c}</option>`).join("")}
+      <option value="__new__" ${selected && !cats.includes(selected) ? "selected" : ""}>+ تصنيف جديد</option>
+    </select>
+    <input type="text" data-cat-new class="${selected && !cats.includes(selected) ? "" : "hidden"}" placeholder="اسم التصنيف الجديد" value="${selected && !cats.includes(selected) ? selected : ""}" style="margin-top:6px;">
+  `;
+}
+function wireCategoryGroup(container) {
+  const sel = container.querySelector("[data-cat-select]");
+  const newInput = container.querySelector("[data-cat-new]");
+  sel.addEventListener("change", () => {
+    newInput.classList.toggle("hidden", sel.value !== "__new__");
+    if (sel.value === "__new__") newInput.focus();
+  });
+}
+function categoryValue(container) {
+  const sel = container.querySelector("[data-cat-select]");
+  if (sel.value === "__new__") return container.querySelector("[data-cat-new]").value.trim();
+  return sel.value;
+}
+
 function renderItemsAdminView() {
   const view = document.getElementById("itemsView");
   if (!view || view.classList.contains("hidden")) return;
@@ -79,8 +104,7 @@ function renderItemsAdminView() {
     </div>
     <div id="itemAddForm" class="settings-card hidden">
       <h3>صنف جديد</h3>
-      <div class="field"><label>التصنيف</label><input type="text" id="newCat" list="catList"></div>
-      <datalist id="catList">${cats.map(c => `<option value="${c}">`).join("")}</datalist>
+      <div class="field" id="newCatGroup"><label>التصنيف</label>${categorySelectHtml(cats, "")}</div>
       <div class="field"><label>اسم الصنف</label><input type="text" id="newName"></div>
       <div class="field"><label>الوحدة</label><input type="text" id="newUnit"></div>
       <div class="field" style="display:flex;align-items:center;gap:8px;">
@@ -96,11 +120,13 @@ function renderItemsAdminView() {
     <div id="itemsList"></div>
   `;
 
+  wireCategoryGroup(document.getElementById("newCatGroup"));
+
   document.getElementById("addItemBtn").addEventListener("click", () => {
     document.getElementById("itemAddForm").classList.toggle("hidden");
   });
   document.getElementById("saveNewItemBtn").addEventListener("click", () => {
-    const category = document.getElementById("newCat").value.trim();
+    const category = categoryValue(document.getElementById("newCatGroup"));
     const name = document.getElementById("newName").value.trim();
     const unit = document.getElementById("newUnit").value.trim();
     const hasCustomName = document.getElementById("newCustomName").checked;
@@ -127,7 +153,7 @@ function renderItemsAdminView() {
         <div class="field"><label>الوحدة</label><input type="text" data-f="unit" value="${item.unit}"></div>
       </div>
       <div class="inputs-row" style="margin-top:8px;">
-        <div class="field"><label>التصنيف</label><input type="text" data-f="category" value="${item.category}"></div>
+        <div class="field" data-cat-group><label>التصنيف</label>${categorySelectHtml(cats, item.category)}</div>
       </div>
       <div class="badges">
         <label class="badge neutral" style="cursor:pointer;">
@@ -144,16 +170,18 @@ function renderItemsAdminView() {
         <button class="btn danger" data-act="del">حذف الصنف</button>
       </div>
     `;
+    wireCategoryGroup(card.querySelector("[data-cat-group]"));
     card.querySelector('[data-act="save"]').addEventListener("click", () => {
       const updated = {
         id: item.id,
         name: card.querySelector('[data-f="name"]').value.trim(),
         unit: card.querySelector('[data-f="unit"]').value.trim(),
-        category: card.querySelector('[data-f="category"]').value.trim(),
+        category: categoryValue(card.querySelector("[data-cat-group]")),
         hasCustomName: card.querySelector('[data-f="hasCustomName"]').checked,
         branches: checkedBranches(card.querySelector('[data-branch-checks]')),
         sortOrder: item.sortOrder
       };
+      if (!updated.category || !updated.name) { showToast("لازم تعبي التصنيف واسم الصنف"); return; }
       Items.save(updated);
       showToast("تم حفظ التعديل");
       renderItemsAdminView();
