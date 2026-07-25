@@ -192,14 +192,27 @@ function sheet(name) {
   return sh;
 }
 
+// Google Sheets أحياناً بيحوّل نص التاريخ ("2026-07-25") لكائن Date حقيقي تلقائياً
+// وقت appendRow حتى لو العمود مهيأ Plain Text — هذا بيكسر كل مقارنة نصية (===, >=, <=)
+// بين تاريخ قادم من العميل (نص) وتاريخ راجع من الشيت (كائن Date). نطبّعه هون مرة وحدة
+// بعد كل قراءة، حتى كل الدوال (getDay/saveDay/getReport/التومورو) تشتغل صح دايماً.
+function normalizeDateValue(v) {
+  if (Object.prototype.toString.call(v) === '[object Date]' && !isNaN(v.getTime())) {
+    return v.getFullYear() + '-' + String(v.getMonth() + 1).padStart(2, '0') + '-' + String(v.getDate()).padStart(2, '0');
+  }
+  return v;
+}
+
 function readRows(name) {
   var sh = sheet(name);
   var values = sh.getDataRange().getValues();
   var headers = values[0];
+  var dateCol = headers.indexOf('date');
   var rows = [];
   for (var i = 1; i < values.length; i++) {
     var row = {};
     for (var c = 0; c < headers.length; c++) row[headers[c]] = values[i][c];
+    if (dateCol >= 0) row.date = normalizeDateValue(row.date);
     rows.push(row);
   }
   return { sh: sh, headers: headers, rows: rows };
@@ -216,9 +229,11 @@ function deleteRowsWhere(name, predicate) {
   var sh = sheet(name);
   var values = sh.getDataRange().getValues();
   var headers = values[0];
+  var dateCol = headers.indexOf('date');
   for (var i = values.length - 1; i >= 1; i--) {
     var row = {};
     for (var c = 0; c < headers.length; c++) row[headers[c]] = values[i][c];
+    if (dateCol >= 0) row.date = normalizeDateValue(row.date);
     if (predicate(row)) sh.deleteRow(i + 1);
   }
 }
