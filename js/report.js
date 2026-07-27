@@ -13,6 +13,14 @@ function monthRange(monthStr) {
 }
 
 function initReportTab() {
+  document.getElementById("reportType").addEventListener("change", (e) => {
+    const isTomorrow = e.target.value === "tomorrow";
+    document.getElementById("entriesReportControls").classList.toggle("hidden", isTomorrow);
+    document.getElementById("tomorrowReportControls").classList.toggle("hidden", !isTomorrow);
+    if (isTomorrow) runTomorrowReport();
+  });
+  initTomorrowReportControls();
+
   const modeSel = document.getElementById("reportMode");
   const dayInput = document.getElementById("reportDayInput");
   const monthInput = document.getElementById("reportMonthInput");
@@ -247,4 +255,105 @@ function exportExcel() {
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detailRows), "التفاصيل اليومية");
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(totalsRows), "الإجمالي");
   XLSX.writeFile(wb, `تقرير_${lastReportRange.start}_${lastReportRange.end}.xlsx`);
+}
+
+// ==================== طلبية الغد (تقرير جاهز للشيف) — فرع واحد أو كل الفروع بنفس الشكل ====================
+
+let lastTomorrowReportRows = [];
+let lastTomorrowReportBranches = [];
+let lastTomorrowReportDate = "";
+
+function initTomorrowReportControls() {
+  document.getElementById("tomorrowReportBranch").innerHTML =
+    `<option value="">كل الفروع</option>` + branchList().map(b => `<option value="${b}">${b}</option>`).join("");
+  document.getElementById("tomorrowReportDate").value = addDaysStr(todayStr(), 1);
+  document.getElementById("tomorrowReportGoBtn").addEventListener("click", runTomorrowReport);
+  document.getElementById("tomorrowReportExportBtn").addEventListener("click", exportTomorrowReportExcel);
+}
+
+async function runTomorrowReport() {
+  const view = document.getElementById("tomorrowReportView");
+  view.innerHTML = '<div class="loader">جاري تجميع طلبية الغد…</div>';
+  await Items.load();
+
+  const date = document.getElementById("tomorrowReportDate").value || addDaysStr(todayStr(), 1);
+  const branchFilter = document.getElementById("tomorrowReportBranch").value;
+  const branches = branchFilter ? [branchFilter] : branchList();
+  lastTomorrowReportDate = date;
+  lastTomorrowReportBranches = branches;
+
+  const perBranch = await Promise.all(branches.map(b =>
+    Sync.get("getTomorrowOrder", { date, branch: b }, "tomorrow:" + date + ":" + b)
+  ));
+
+  // نجمع الأصناف (بترتيب/تصنيف القائمة الأساسية) مع كمية كل فرع بعمود لحاله
+  const rowsByItem = {};
+  Items.current.forEach(it => {
+    rowsByItem[it.id] = { itemId: it.id, category: it.category, name: it.name, unit: it.unit, sortOrder: it.sortOrder, qtyByBranch: {}, notes: [] };
+  });
+  branches.forEach((b, i) => {
+    (perBranch[i] || []).forEach(entry => {
+      if (!rowsByItem[entry.itemId]) {
+        rowsByItem[entry.itemId] = { itemId: entry.itemId, category: "-", name: entry.itemName, unit: entry.unit, sortOrder: 999, qtyByBranch: {}, notes: [] };
+      }
+      rowsByItem[entry.itemId].qtyByBranch[b] = entry.qty;
+      if (entry.notes) rowsByItem[entry.itemId].notes.push(branchFilter ? entry.notes : `${b}: ${entry.notes}`);
+    });
+  });
+
+  const rows = Object.values(rowsByItem)
+    .filter(r => Object.values(r.qtyByBranch).some(q => q !== "" && q != null && Number(q) > 0))
+    .sort((a, b) => String(a.category).localeCompare(String(b.category)) || (Number(a.sortOrder) - Number(b.sortOrder)));
+
+  lastTomorrowReportRows = rows;
+  renderTomorrowReport(rows, branches, date);
+}
+
+function renderTomorrowReport(rows, branches, date) {
+  const view = document.getElementById("tomorrowReportView");
+  if (!rows.length) {
+    view.innerHTML = '<div class="empty-state">مافي طلبية محفوظة لهذا اليوم/الفرع بعد.<br>ابدأ بتعبئة تاب "طلبية الغد".</div>';
+    return;
+  }
+
+  const branchCols = branches.map(b => `<th>${b} (الكمية)</th>`).join("");
+  const showTotal = branches.length > 1;
+
+  const bodyRows = rows.map(r => {
+    const catCell = `<td class="cat-cell">${r.category}</td>`;
+    const qtyCells = branches.map(b => `<td>${r.qtyByBranch[b] ?? "—"}</td>`).join("");
+    const total = branches.reduce((sum, b) => sum + (Number(r.qtyByBranch[b]) || 0), 0);
+    const totalCell = showTotal ? `<td class="total-cell">${total}</td>` : "";
+    return `<tr>${catCell}<td class="name-cell">${r.name}</td><td>${r.unit}</td>${qtyCells}${totalCell}<td>${r.notes.join(" / ")}</td></tr>`;
+  }).join("");
+
+  view.innerHTML = `
+    <div class="order-table-wrap">
+      <div class="order-header">طلبية الغد — ${date} — ${branches.length > 1 ? "كل الفروع" : branches[0]}</div>
+      <table class="order-table">
+        <thead><tr>
+          <th>الفئة</th><th>اسم الصنف</th><th>الوحدة</th>${branchCols}${showTotal ? "<th>المجموع</th>" : ""}<th>ملاحظات</th>
+        </tr></thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function exportTomorrowReportExcel() {
+  if (!lastTomorrowReportRows.length) { showToast("مافي بيانات للتصدير"); return; }
+  if (typeof XLSX === "undefined") { showToast("مكتبة Excel لسا ما تحمّلت، جرب مرة ثانية"); return; }
+
+  const showTotal = lastTomorrowReportBranches.length > 1;
+  const rows = lastTomorrowReportRows.map(r => {
+    const row = { "الفئة": r.category, "اسم الصنف": r.name, "الوحدة": r.unit };
+    lastTomorrowReportBranches.forEach(b => { row[b] = r.qtyByBranch[b] ?? ""; });
+    if (showTotal) row["المجموع"] = lastTomorrowReportBranches.reduce((s, b) => s + (Number(r.qtyByBranch[b]) || 0), 0);
+    row["ملاحظات"] = r.notes.join(" / ");
+    return row;
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "طلبية الغد");
+  XLSX.writeFile(wb, `طلبية_الغد_${lastTomorrowReportDate}.xlsx`);
 }

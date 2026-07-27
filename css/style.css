@@ -180,3 +180,14 @@ main{ padding:14px 12px 10px; max-width:640px; margin:0 auto; }
   box-shadow:0 6px 20px rgba(0,0,0,.2);
 }
 .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+/* جدول طلبية الغد — بشكل نموذج ورقي (فئة/صنف/وحدة/كمية) */
+.order-table-wrap{ overflow-x:auto; background:var(--card); border:1px solid var(--border); border-radius:14px; }
+table.order-table{ width:100%; border-collapse:collapse; font-size:13px; white-space:nowrap; }
+table.order-table th, table.order-table td{ border:1px solid var(--border); padding:8px 10px; text-align:center; }
+table.order-table thead th{ background:var(--black); color:var(--yellow); font-weight:800; position:sticky; top:0; }
+table.order-table td.cat-cell{ background:#FFF8E6; font-weight:800; color:var(--yellow-dark); text-align:center; }
+table.order-table td.name-cell{ text-align:right; font-weight:700; }
+table.order-table tbody tr:nth-child(even){ background:#FAFBFC; }
+table.order-table td.total-cell{ font-weight:900; background:#FFF4D6; }
+.order-header{ text-align:center; font-weight:800; padding:10px; }

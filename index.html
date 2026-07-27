@@ -46,29 +46,48 @@
 
   <div id="reportContainer" class="view hidden">
     <div class="toolbar">
-      <select id="reportMode">
-        <option value="day">يوم</option>
-        <option value="month" selected>شهر</option>
-        <option value="range">فترة</option>
+      <select id="reportType">
+        <option value="entries">تقرير الاستلام/الإرجاع</option>
+        <option value="tomorrow">طلبية الغد (للشيف)</option>
       </select>
-      <input type="date" id="reportDayInput" class="hidden">
-      <input type="month" id="reportMonthInput">
-      <input type="date" id="reportStartInput" class="hidden">
-      <span class="hidden" id="reportRangeSep">←</span>
-      <input type="date" id="reportEndInput" class="hidden">
-      <button class="btn primary" id="reportGoBtn">عرض</button>
-      <button class="btn gold" id="exportExcelBtn">⬇ تصدير Excel</button>
     </div>
-    <div class="toolbar">
-      <select id="reportBranchFilter"><option value="">كل الفروع</option></select>
-      <select id="reportCategoryFilter"><option value="">كل التصنيفات</option></select>
-      <select id="reportEmployeeFilter"><option value="">كل الموظفين</option></select>
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;cursor:pointer;">
-        <input type="checkbox" id="reportFlaggedOnly" style="width:auto;">
-        الأصناف المرتفعة الإرجاع بس
-      </label>
+
+    <div id="entriesReportControls">
+      <div class="toolbar">
+        <select id="reportMode">
+          <option value="day">يوم</option>
+          <option value="month" selected>شهر</option>
+          <option value="range">فترة</option>
+        </select>
+        <input type="date" id="reportDayInput" class="hidden">
+        <input type="month" id="reportMonthInput">
+        <input type="date" id="reportStartInput" class="hidden">
+        <span class="hidden" id="reportRangeSep">←</span>
+        <input type="date" id="reportEndInput" class="hidden">
+        <button class="btn primary" id="reportGoBtn">عرض</button>
+        <button class="btn gold" id="exportExcelBtn">⬇ تصدير Excel</button>
+      </div>
+      <div class="toolbar">
+        <select id="reportBranchFilter"><option value="">كل الفروع</option></select>
+        <select id="reportCategoryFilter"><option value="">كل التصنيفات</option></select>
+        <select id="reportEmployeeFilter"><option value="">كل الموظفين</option></select>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;cursor:pointer;">
+          <input type="checkbox" id="reportFlaggedOnly" style="width:auto;">
+          الأصناف المرتفعة الإرجاع بس
+        </label>
+      </div>
+      <div id="reportView"></div>
     </div>
-    <div id="reportView"></div>
+
+    <div id="tomorrowReportControls" class="hidden">
+      <div class="toolbar">
+        <input type="date" id="tomorrowReportDate">
+        <select id="tomorrowReportBranch"><option value="">كل الفروع</option></select>
+        <button class="btn primary" id="tomorrowReportGoBtn">عرض</button>
+        <button class="btn gold" id="tomorrowReportExportBtn">⬇ تصدير Excel</button>
+      </div>
+      <div id="tomorrowReportView"></div>
+    </div>
   </div>
 
   <div id="itemsView" class="view hidden"></div>
