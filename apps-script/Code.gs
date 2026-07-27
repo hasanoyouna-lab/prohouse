@@ -49,8 +49,9 @@ function setupEverything() {
     // نكتب صف العناوين دايماً (حتى لو الشيت مش فاضي) — كتابة العناوين آمنة 100% وما بتلمس صفوف البيانات (تبلش من صف 2)،
     // وهيك بتصلح لحالها أي عناوين مكتوبة غلط يدوياً قبل هيك.
     sh.getRange(1, 1, 1, headers.length).setValues([headers]);
-    var dateCol = headers.indexOf('date');
-    if (dateCol >= 0) sh.getRange(2, dateCol + 1, 2000, 1).setNumberFormat('@');
+    // نص عادي لكل الأعمدة (مو بس date) — Sheets بيحوّل قيم زي "1/3" أو "2026-07-25" لتاريخ
+    // تلقائياً حتى لو العمود Plain Text أصلاً؛ هذا بيمنع تكرار المشكلة بأي عمود مستقبلاً.
+    sh.getRange(2, 1, 2000, headers.length).setNumberFormat('@');
   });
 
   // احذف تبويب "Sheet1" الفاضي الافتراضي إذا ما زال موجود وما فيه بيانات
@@ -196,10 +197,19 @@ function sheet(name) {
 // وقت appendRow حتى لو العمود مهيأ Plain Text — هذا بيكسر كل مقارنة نصية (===, >=, <=)
 // بين تاريخ قادم من العميل (نص) وتاريخ راجع من الشيت (كائن Date). نطبّعه هون مرة وحدة
 // بعد كل قراءة، حتى كل الدوال (getDay/saveDay/getReport/التومورو) تشتغل صح دايماً.
+function isDateValue(v) {
+  return Object.prototype.toString.call(v) === '[object Date]' && !isNaN(v.getTime());
+}
 function normalizeDateValue(v) {
-  if (Object.prototype.toString.call(v) === '[object Date]' && !isNaN(v.getTime())) {
+  if (isDateValue(v)) {
     return v.getFullYear() + '-' + String(v.getMonth() + 1).padStart(2, '0') + '-' + String(v.getDate()).padStart(2, '0');
   }
+  return v;
+}
+// عمود "unit" أحياناً بيحوي قيم متل "1/3" أو "1/2" — Google Sheets بيفسّرها كتاريخ (يوم/شهر)
+// ويحوّلها لكائن Date تلقائياً حتى لو العمود Plain Text. نعيد بناء النص الأصلي "يوم/شهر" من التاريخ.
+function normalizeUnitValue(v) {
+  if (isDateValue(v)) return v.getDate() + '/' + (v.getMonth() + 1);
   return v;
 }
 
@@ -208,11 +218,13 @@ function readRows(name) {
   var values = sh.getDataRange().getValues();
   var headers = values[0];
   var dateCol = headers.indexOf('date');
+  var unitCol = headers.indexOf('unit');
   var rows = [];
   for (var i = 1; i < values.length; i++) {
     var row = {};
     for (var c = 0; c < headers.length; c++) row[headers[c]] = values[i][c];
     if (dateCol >= 0) row.date = normalizeDateValue(row.date);
+    if (unitCol >= 0) row.unit = normalizeUnitValue(row.unit);
     rows.push(row);
   }
   return { sh: sh, headers: headers, rows: rows };
