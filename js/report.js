@@ -321,10 +321,13 @@ function renderTomorrowReport(rows, branches, date) {
 
   const bodyRows = rows.map(r => {
     const catCell = `<td class="cat-cell">${r.category}</td>`;
-    const qtyCells = branches.map(b => `<td>${r.qtyByBranch[b] ?? "—"}</td>`).join("");
+    const qtyCells = branches.map(b => {
+      const q = r.qtyByBranch[b];
+      return `<td>${q !== undefined && q !== null && q !== "" ? `${q} ${r.unit || ""}` : "—"}</td>`;
+    }).join("");
     const total = branches.reduce((sum, b) => sum + (Number(r.qtyByBranch[b]) || 0), 0);
-    const totalCell = showTotal ? `<td class="total-cell">${total}</td>` : "";
-    return `<tr>${catCell}<td class="name-cell">${r.name}</td><td>${r.unit}</td>${qtyCells}${totalCell}<td>${r.notes.join(" / ")}</td></tr>`;
+    const totalCell = showTotal ? `<td class="total-cell">${total} ${r.unit || ""}</td>` : "";
+    return `<tr>${catCell}<td class="name-cell">${r.name}</td>${qtyCells}${totalCell}<td>${r.notes.join(" / ")}</td></tr>`;
   }).join("");
 
   view.innerHTML = `
@@ -332,7 +335,7 @@ function renderTomorrowReport(rows, branches, date) {
       <div class="order-header">طلبية الغد — ${date} — ${branches.length > 1 ? "كل الفروع" : branches[0]}</div>
       <table class="order-table">
         <thead><tr>
-          <th>الفئة</th><th>اسم الصنف</th><th>الوحدة</th>${branchCols}${showTotal ? "<th>المجموع</th>" : ""}<th>ملاحظات</th>
+          <th>الفئة</th><th>اسم الصنف</th>${branchCols}${showTotal ? "<th>المجموع</th>" : ""}<th>ملاحظات</th>
         </tr></thead>
         <tbody>${bodyRows}</tbody>
       </table>
@@ -344,16 +347,51 @@ function exportTomorrowReportExcel() {
   if (!lastTomorrowReportRows.length) { showToast("مافي بيانات للتصدير"); return; }
   if (typeof XLSX === "undefined") { showToast("مكتبة Excel لسا ما تحمّلت، جرب مرة ثانية"); return; }
 
-  const showTotal = lastTomorrowReportBranches.length > 1;
-  const rows = lastTomorrowReportRows.map(r => {
-    const row = { "الفئة": r.category, "اسم الصنف": r.name, "الوحدة": r.unit };
-    lastTomorrowReportBranches.forEach(b => { row[b] = r.qtyByBranch[b] ?? ""; });
-    if (showTotal) row["المجموع"] = lastTomorrowReportBranches.reduce((s, b) => s + (Number(r.qtyByBranch[b]) || 0), 0);
-    row["ملاحظات"] = r.notes.join(" / ");
-    return row;
+  const branches = lastTomorrowReportBranches;
+  const showTotal = branches.length > 1;
+  const qtyCell = (r, b) => {
+    const q = r.qtyByBranch[b];
+    return q !== undefined && q !== null && q !== "" ? `${q} ${r.unit || ""}` : "—";
+  };
+
+  const header = ["الفئة", "اسم الصنف", ...branches, ...(showTotal ? ["المجموع"] : []), "ملاحظات"];
+  const aoa = [header];
+  const merges = [];
+  let rowIdx = 1; // 0 = header
+
+  const grouped = [];
+  lastTomorrowReportRows.forEach(r => {
+    const last = grouped[grouped.length - 1];
+    if (last && last.category === r.category) last.items.push(r); else grouped.push({ category: r.category, items: [r] });
   });
 
+  grouped.forEach(group => {
+    const startRow = rowIdx;
+    group.items.forEach(r => {
+      const total = branches.reduce((s, b) => s + (Number(r.qtyByBranch[b]) || 0), 0);
+      aoa.push([
+        r.category, r.name,
+        ...branches.map(b => qtyCell(r, b)),
+        ...(showTotal ? [`${total} ${r.unit || ""}`] : []),
+        r.notes.join(" / ")
+      ]);
+      rowIdx++;
+    });
+    if (group.items.length > 1) merges.push({ s: { r: startRow, c: 0 }, e: { r: rowIdx - 1, c: 0 } });
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!merges"] = merges;
+  ws["!cols"] = [
+    { wch: 14 }, { wch: 26 },
+    ...branches.map(() => ({ wch: 16 })),
+    ...(showTotal ? [{ wch: 14 }] : []),
+    { wch: 24 }
+  ];
+  ws["!rightToLeft"] = true;
+
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "طلبية الغد");
+  wb.Workbook = { Views: [{ RTL: true }] };
+  XLSX.utils.book_append_sheet(wb, ws, "طلبية الغد");
   XLSX.writeFile(wb, `طلبية_الغد_${lastTomorrowReportDate}.xlsx`);
 }
