@@ -5,3 +5,10 @@ const APP_VERSION = "2.1.0";
 
 // قائمة افتراضية للفروع (تُستبدل بقيمة إعداد "branches" من شاشة الإعدادات إذا كانت محفوظة)
 const DEFAULT_BRANCHES_FALLBACK = "الروضة,الشاطئ,عبداللطيف جميل";
+
+// ترتيب ثابت للتصنيفات (مطابق لترتيب النموذج الورقي) — أي تصنيف جديد مو موجود هون بينحط بالآخر
+const CATEGORY_ORDER = ["دجاج", "لحم", "بحري", "كارب", "السلطات", "الحلويات", "فطور", "معدات"];
+function categoryRank(cat) {
+  const i = CATEGORY_ORDER.indexOf(cat);
+  return i === -1 ? CATEGORY_ORDER.length : i;
+}

@@ -1,8 +1,12 @@
 :root{
-  --black:#0B0B0C;
-  --black-light:#1C1C1F;
-  --yellow:#F2C230;
-  --yellow-dark:#D9A72C;
+  /* هوية Pro House الرسمية (من دليل الهوية البصرية) */
+  --black:#000000;
+  --black-light:#1C1C1C;
+  --yellow:#F7DC4E;
+  --yellow-dark:#D6BE3B;
+  --brand-red:#ff5151;
+  --brand-gray:#575454;
+  --brand-purple:#5E17EB;
   --bg:#F5F6F8;
   --card:#FFFFFF;
   --red:#C0392B;
@@ -15,10 +19,11 @@
 }
 *{box-sizing:border-box;}
 body{
-  margin:0; font-family:-apple-system, "SF Pro Text", Tahoma, Arial, sans-serif;
+  margin:0; font-family:"Frutiger", "Frutiger Arabic", Tahoma, Arial, sans-serif;
   background:var(--bg); color:var(--text); padding-bottom:96px;
   -webkit-tap-highlight-color: transparent;
 }
+.brand-display{ font-family:Impact, "Arial Narrow Bold", sans-serif; }
 
 header{
   background:linear-gradient(135deg, var(--black), var(--black-light));
@@ -28,17 +33,18 @@ header{
 .header-top{ display:flex; align-items:center; gap:10px; }
 .logo{ height:34px; }
 .logo-text{
+  font-family:Impact, "Arial Narrow Bold", sans-serif;
   font-weight:900; font-size:16px; letter-spacing:.5px; line-height:1.1;
   display:flex; flex-direction:column; color:#fff;
 }
 .logo-text span{ color:var(--yellow); }
 header .title-block{ flex:1; }
-header h1{ margin:0; font-size:16px; font-weight:800; }
+header h1{ margin:0; font-size:16px; font-weight:800; font-family:Impact, "Arial Narrow Bold", sans-serif; letter-spacing:.3px; }
 header .sub{ font-size:11.5px; opacity:.8; margin-top:1px; }
 
 .sync-badge{
   font-size:11px; font-weight:700; padding:5px 10px; border-radius:20px;
-  background:rgba(242,194,48,.18); color:var(--yellow); white-space:nowrap;
+  background:rgba(247,220,78,.22); color:var(--yellow); white-space:nowrap;
   display:flex; align-items:center; gap:5px; cursor:pointer; border:none; font-family:inherit;
 }
 .sync-badge.ok{ background:rgba(30,123,77,.2); color:#5fd9a0; }
