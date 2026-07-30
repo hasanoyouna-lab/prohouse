@@ -1,6 +1,7 @@
 // ==================== الإعدادات (اسم الفرع/المطعم، الشعار، نسخ احتياطي/استعادة) ====================
 
 let currentSettings = {};
+let categoryOrderState = [];
 
 async function loadSettings() {
   const data = await Sync.get("getSettings", {}, "settings", (val) => { currentSettings = val || {}; applyBrandingFromSettings(); });
@@ -21,9 +22,47 @@ function applyBrandingFromSettings() {
   }
 }
 
+function initCategoryOrderState() {
+  const saved = (currentSettings.categoryOrder || DEFAULT_CATEGORY_ORDER_FALLBACK)
+    .split(",").map(s => s.trim()).filter(Boolean);
+  const fromItems = (typeof Items !== "undefined" ? Items.current : [])
+    .map(it => it.category).filter(Boolean);
+  const extra = [...new Set(fromItems)].filter(c => !saved.includes(c));
+  categoryOrderState = [...saved, ...extra];
+}
+
+function categoryOrderListHtml() {
+  return categoryOrderState.map((cat, i) => `
+    <div class="cat-order-row">
+      <span class="cat-order-num">${i + 1}</span>
+      <span class="cat-order-name">${cat}</span>
+      <div class="cat-order-btns">
+        <button type="button" class="cat-order-btn" data-dir="up" data-idx="${i}" ${i === 0 ? "disabled" : ""}>▲</button>
+        <button type="button" class="cat-order-btn" data-dir="down" data-idx="${i}" ${i === categoryOrderState.length - 1 ? "disabled" : ""}>▼</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function renderCategoryOrderList() {
+  const wrap = document.getElementById("categoryOrderList");
+  if (!wrap) return;
+  wrap.innerHTML = categoryOrderListHtml();
+  wrap.querySelectorAll(".cat-order-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.dataset.idx);
+      const j = btn.dataset.dir === "up" ? i - 1 : i + 1;
+      if (j < 0 || j >= categoryOrderState.length) return;
+      [categoryOrderState[i], categoryOrderState[j]] = [categoryOrderState[j], categoryOrderState[i]];
+      renderCategoryOrderList();
+    });
+  });
+}
+
 function renderSettingsView() {
   const view = document.getElementById("settingsView");
   if (!view) return;
+  initCategoryOrderState();
   view.innerHTML = `
     <div class="settings-card">
       <h3>هوية المطعم</h3>
@@ -44,8 +83,8 @@ function renderSettingsView() {
     <div class="settings-card">
       <h3>ترتيب التصنيفات</h3>
       <div class="field">
-        <label>رتّب التصنيفات بالفاصلة (بنفس الترتيب اللي بدك ياه يظهر بكل الشاشات والتقارير)</label>
-        <input type="text" id="setCategoryOrder" value="${currentSettings.categoryOrder || DEFAULT_CATEGORY_ORDER_FALLBACK}">
+        <label>رتّب التصنيفات بالأسهم (بنفس الترتيب اللي بدك ياه يظهر بكل الشاشات والتقارير)</label>
+        <div id="categoryOrderList" class="cat-order-list">${categoryOrderListHtml()}</div>
       </div>
       <button class="btn gold" id="saveCategoryOrderBtn">حفظ الترتيب</button>
     </div>
@@ -98,8 +137,10 @@ function renderSettingsView() {
     showToast("تم حفظ الفروع");
   });
 
+  renderCategoryOrderList();
+
   document.getElementById("saveCategoryOrderBtn").addEventListener("click", () => {
-    const payload = { categoryOrder: document.getElementById("setCategoryOrder").value.trim() };
+    const payload = { categoryOrder: categoryOrderState.join(",") };
     currentSettings = { ...currentSettings, ...payload };
     Sync.cacheSet("settings", currentSettings);
     Sync.enqueue("saveSettings:categoryOrder", "saveSettings", payload);

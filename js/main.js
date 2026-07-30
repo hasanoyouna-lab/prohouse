@@ -18,7 +18,7 @@ function setActiveTab(tab) {
 
   if (tab === "dashboard") { renderDashboard(); }
   if (tab === "items") { Items.load().then(renderItemsAdminView); }
-  if (tab === "settings") { loadSettings().then(renderSettingsView); }
+  if (tab === "settings") { Promise.all([loadSettings(), Items.load()]).then(renderSettingsView); }
 }
 
 document.querySelectorAll(".tab-btn").forEach(btn => {
