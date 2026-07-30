@@ -18,12 +18,29 @@
   --text:#1C2430;
 }
 *{box-sizing:border-box;}
+html{ scroll-behavior:smooth; }
 body{
-  margin:0; font-family:"Frutiger", "Frutiger Arabic", Tahoma, Arial, sans-serif;
+  margin:0; font-family:"Tajawal", Tahoma, Arial, sans-serif;
   background:var(--bg); color:var(--text); padding-bottom:96px;
   -webkit-tap-highlight-color: transparent;
 }
-.brand-display{ font-family:Impact, "Arial Narrow Bold", sans-serif; }
+.brand-display{ font-family:"Anton", "Arial Narrow Bold", sans-serif; }
+
+/* ==================== حركات وانتقالات خفيفة ==================== */
+@keyframes fadeInUp{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:translateY(0); } }
+@keyframes popIn{ 0%{ transform:scale(.9); opacity:0; } 60%{ transform:scale(1.03); opacity:1; } 100%{ transform:scale(1); } }
+@keyframes pulseSoft{ 0%,100%{ box-shadow:0 0 0 0 rgba(247,220,78,.5); } 50%{ box-shadow:0 0 0 6px rgba(247,220,78,0); } }
+
+.view{ animation:fadeInUp .28s ease both; }
+.item-card, .report-card, .settings-card{ animation:fadeInUp .25s ease both; }
+
+.tab-btn, .btn, .save-btn, .sync-badge{ transition:transform .12s ease, background .2s ease, opacity .2s ease, box-shadow .2s ease; }
+.tab-btn:active, .btn:active, .save-btn:active{ transform:scale(.96); }
+.tab-btn.active{ animation:popIn .22s ease; }
+
+.sync-badge.pending{ animation:pulseSoft 1.6s ease-in-out infinite; }
+
+input, select, textarea{ transition:border-color .15s ease, background .15s ease; }
 
 header{
   background:linear-gradient(135deg, var(--black), var(--black-light));
@@ -33,13 +50,13 @@ header{
 .header-top{ display:flex; align-items:center; gap:10px; }
 .logo{ height:34px; }
 .logo-text{
-  font-family:Impact, "Arial Narrow Bold", sans-serif;
+  font-family:"Anton", "Arial Narrow Bold", sans-serif;
   font-weight:900; font-size:16px; letter-spacing:.5px; line-height:1.1;
   display:flex; flex-direction:column; color:#fff;
 }
 .logo-text span{ color:var(--yellow); }
 header .title-block{ flex:1; }
-header h1{ margin:0; font-size:16px; font-weight:800; font-family:Impact, "Arial Narrow Bold", sans-serif; letter-spacing:.3px; }
+header h1{ margin:0; font-size:16px; font-weight:800; font-family:"Anton", "Arial Narrow Bold", sans-serif; letter-spacing:.3px; }
 header .sub{ font-size:11.5px; opacity:.8; margin-top:1px; }
 
 .sync-badge{
@@ -197,3 +214,60 @@ table.order-table td.name-cell{ text-align:right; font-weight:700; }
 table.order-table tbody tr:nth-child(even){ background:#FAFBFC; }
 table.order-table td.total-cell{ font-weight:900; background:#FFF4D6; }
 .order-header{ text-align:center; font-weight:800; padding:10px; }
+
+/* ==================== لوحة الرئيسية (Dashboard) ==================== */
+.dash-greeting{ font-size:15px; font-weight:800; margin-bottom:2px; }
+.dash-date{ font-size:12px; color:var(--gray); margin-bottom:14px; }
+
+.dash-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:16px; }
+.dash-card{
+  background:var(--card); border:1px solid var(--border); border-radius:16px; padding:14px;
+  display:flex; flex-direction:column; gap:6px; cursor:pointer; transition:transform .15s ease, box-shadow .15s ease;
+}
+.dash-card:active{ transform:scale(.97); }
+.dash-card:hover{ box-shadow:0 6px 18px rgba(0,0,0,.08); }
+.dash-card .branch-name{ font-size:14px; font-weight:800; }
+.dash-card .status-pill{
+  align-self:flex-start; font-size:11px; font-weight:800; padding:4px 10px; border-radius:20px;
+}
+.dash-card .status-pill.done{ background:var(--green-bg); color:var(--green); }
+.dash-card .status-pill.partial{ background:#FFF4D6; color:#8a6d00; }
+.dash-card .status-pill.none{ background:#EEF0F3; color:var(--gray); }
+.dash-card .progress-track{ height:6px; border-radius:6px; background:#EEF0F3; overflow:hidden; margin-top:2px; }
+.dash-card .progress-fill{ height:100%; background:var(--yellow-dark); border-radius:6px; transition:width .4s ease; }
+
+.dash-tile{
+  background:var(--black); color:#fff; border-radius:16px; padding:16px; display:flex;
+  align-items:center; justify-content:space-between; margin-bottom:12px; cursor:pointer;
+}
+.dash-tile .big{ font-size:24px; font-weight:900; color:var(--yellow); }
+.dash-tile .lbl{ font-size:12.5px; font-weight:700; max-width:70%; }
+
+.dash-links{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+
+/* ==================== فئات قابلة للطي بشاشة إدخال اليوم ==================== */
+.category-section{ margin-bottom:14px; }
+.category-header{
+  position:sticky; top:0; z-index:5; display:flex; align-items:center; justify-content:space-between;
+  background:var(--bg); padding:10px 4px 8px; cursor:pointer; user-select:none;
+}
+.category-header .cat-label{ font-size:13.5px; font-weight:800; color:var(--yellow-dark); display:flex; align-items:center; gap:6px; }
+.category-header .cat-label::before{ content:""; width:6px; height:6px; border-radius:50%; background:var(--yellow-dark); }
+.category-header .cat-count{ font-size:11.5px; font-weight:700; color:var(--gray); }
+.category-header .chevron{ transition:transform .2s ease; font-size:12px; color:var(--gray); margin-inline-start:6px; }
+.category-section.collapsed .chevron{ transform:rotate(-90deg); }
+.category-body{ overflow:hidden; transition:grid-template-rows .25s ease; display:grid; grid-template-rows:1fr; }
+.category-section.collapsed .category-body{ grid-template-rows:0fr; }
+.category-body > div{ overflow:hidden; }
+
+.progress-bar-wrap{
+  position:sticky; top:0; z-index:6; background:var(--bg); padding:6px 4px 10px;
+}
+.progress-bar-track{ height:9px; border-radius:9px; background:#EEF0F3; overflow:hidden; }
+.progress-bar-fill{ height:100%; background:linear-gradient(90deg, var(--yellow-dark), var(--yellow)); border-radius:9px; transition:width .35s ease; }
+.progress-bar-label{ font-size:11px; color:var(--gray); font-weight:700; margin-top:5px; text-align:center; }
+
+.item-card.warn-empty{ border-color:var(--red); box-shadow:0 0 0 1px var(--red-bg); }
+
+/* ==================== مخطط الاتجاه بالتقارير ==================== */
+.chart-wrap{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:12px; margin-bottom:14px; height:220px; }

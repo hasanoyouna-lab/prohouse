@@ -5,7 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Pro House — استلام وإرجاع الأصناف</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0B0B0C">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -22,14 +25,15 @@
   </div>
 
   <div class="tabs">
-    <button class="tab-btn active" data-tab="entry">📝 طلبية اليوم</button>
+    <button class="tab-btn active" data-tab="dashboard">🏠 الرئيسية</button>
+    <button class="tab-btn" data-tab="entry">📝 طلبية اليوم</button>
     <button class="tab-btn" data-tab="tomorrow">📦 طلبية الغد</button>
     <button class="tab-btn" data-tab="report">📊 التقارير</button>
     <button class="tab-btn" data-tab="items">🍽 إدارة الأصناف</button>
     <button class="tab-btn" data-tab="settings">⚙ الإعدادات</button>
   </div>
 
-  <div class="datebar" id="entryDateBar">
+  <div class="datebar hidden" id="entryDateBar">
     <input type="date" id="dateInput">
   </div>
   <div class="datebar hidden" id="tomorrowDateBar">
@@ -40,7 +44,9 @@
 <main>
   <div id="offlineBanner" class="offline-banner hidden">غير متصل بالإنترنت — بتشتغل ببيانات محفوظة محلياً وبتتزامن لما يرجع النت</div>
 
-  <div id="entryView" class="view"></div>
+  <div id="dashboardView" class="view"></div>
+
+  <div id="entryView" class="view hidden"></div>
 
   <div id="tomorrowView" class="view hidden"></div>
 
@@ -95,7 +101,7 @@
   <div id="settingsView" class="view hidden"></div>
 </main>
 
-<div class="save-bar" id="saveBarEntry">
+<div class="save-bar hidden" id="saveBarEntry">
   <div class="save-status" id="saveStatus">لسا ما تحفظ شي لهذا اليوم</div>
   <button class="save-btn" id="saveBtn">💾 حفظ اليوم</button>
 </div>
@@ -108,6 +114,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="js/config.js"></script>
 <script src="js/sync.js"></script>
 <script src="js/entry.js"></script>
@@ -115,6 +122,7 @@
 <script src="js/tomorrow.js"></script>
 <script src="js/report.js"></script>
 <script src="js/settings.js"></script>
+<script src="js/dashboard.js"></script>
 <script src="js/main.js"></script>
 
 </body>

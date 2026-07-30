@@ -89,6 +89,16 @@ function computeReturnStatus(received, returned) {
   return { text: "إرجاع طبيعي " + Math.round(pct * 100) + "%", cls: "ok" };
 }
 
+let categoryCollapsed = {}; // فئة -> مطوية أو لا (افتراضياً كل الفئات مفتوحة، متل ورقة كاملة)
+let currentEntryGroups = []; // [{category, items}] — آخر تجميع اترسم، نعتمد عليه بالتحديثات الجزئية بدون إعادة رسم كامل
+let currentVisibleItems = [];
+
+function isItemConfirmed(id) { return !!(currentEntry[id] && currentEntry[id].confirmed); }
+function isItemWarnEmpty(id) {
+  const e = currentEntry[id];
+  return !!(e && e.confirmed && (e.received === "" || e.received === null || e.received === undefined));
+}
+
 function renderEntryView() {
   const view = document.getElementById("entryView");
   if (!view) return;
@@ -127,46 +137,84 @@ function renderEntryView() {
     return;
   }
 
-  let lastCat = null;
+  // شريط تقدّم عام فوق كل شي
+  const progressWrap = document.createElement("div");
+  progressWrap.className = "progress-bar-wrap";
+  progressWrap.id = "entryProgressWrap";
+  view.appendChild(progressWrap);
+
+  // تجميع الأصناف حسب الفئة بنفس ترتيبها القادم من السيرفر
+  const groups = [];
   visibleItems.forEach(item => {
-    if (item.category !== lastCat) {
-      const h = document.createElement("div");
-      h.className = "cat-title";
-      h.textContent = item.category;
-      view.appendChild(h);
-      lastCat = item.category;
-    }
-    const entry = currentEntry[item.id] || { received: "", returned: "", notes: "", cookName: "", confirmed: false };
-    const card = document.createElement("div");
-    card.className = "item-card";
-    card.innerHTML = `
-      <div class="item-name" style="display:flex;align-items:center;justify-content:space-between;">
-        <span>${item.name} <span class="item-unit">(${item.unit})</span></span>
-        <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;cursor:pointer;">
-          <input type="checkbox" data-id="${item.id}" data-field="confirmed" ${entry.confirmed ? "checked" : ""} style="width:18px;height:18px;">
-          تم الاستلام
-        </label>
-      </div>
-      ${item.hasCustomName ? `
-        <div class="cookname-row">
-          <input type="text" placeholder="اسم الطبخة (مطلوب)" data-id="${item.id}" data-field="cookName" value="${entry.cookName || ""}">
-        </div>` : ""}
-      <div class="inputs-row">
-        <div class="field">
-          <label>الكمية المستلمة (جم)</label>
-          <input type="number" inputmode="decimal" data-id="${item.id}" data-field="received" value="${entry.received}">
-        </div>
-        <div class="field">
-          <label>الكمية المرتجعة (جم)</label>
-          <input type="number" inputmode="decimal" data-id="${item.id}" data-field="returned" value="${entry.returned}">
-        </div>
-      </div>
-      <div class="notes-row">
-        <input type="text" placeholder="ملاحظة (اختياري)" data-id="${item.id}" data-field="notes" value="${entry.notes || ""}">
-      </div>
-      <div class="badges" id="badges-${item.id}"></div>
+    const last = groups[groups.length - 1];
+    if (last && last.category === item.category) last.items.push(item);
+    else groups.push({ category: item.category, items: [item] });
+  });
+
+  groups.forEach(group => {
+    const section = document.createElement("div");
+    section.className = "category-section";
+    section.dataset.cat = group.category;
+    if (categoryCollapsed[group.category]) section.classList.add("collapsed");
+
+    const header = document.createElement("div");
+    header.className = "category-header";
+    header.innerHTML = `
+      <span class="cat-label">${group.category}</span>
+      <span style="display:flex;align-items:center;">
+        <span class="cat-count" id="catcount-${cssId(group.category)}"></span>
+        <span class="chevron">▾</span>
+      </span>
     `;
-    view.appendChild(card);
+    header.addEventListener("click", () => {
+      categoryCollapsed[group.category] = !categoryCollapsed[group.category];
+      section.classList.toggle("collapsed", !!categoryCollapsed[group.category]);
+    });
+    section.appendChild(header);
+
+    const body = document.createElement("div");
+    body.className = "category-body";
+    const inner = document.createElement("div");
+    body.appendChild(inner);
+    section.appendChild(body);
+
+    group.items.forEach(item => {
+      const entry = currentEntry[item.id] || { received: "", returned: "", notes: "", cookName: "", confirmed: false };
+      const card = document.createElement("div");
+      card.className = "item-card";
+      card.id = "card-" + item.id;
+      card.innerHTML = `
+        <div class="item-name" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>${item.name} <span class="item-unit">(${item.unit})</span></span>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;cursor:pointer;">
+            <input type="checkbox" data-id="${item.id}" data-field="confirmed" ${entry.confirmed ? "checked" : ""} style="width:20px;height:20px;">
+            تم الاستلام
+          </label>
+        </div>
+        ${item.hasCustomName ? `
+          <div class="cookname-row">
+            <input type="text" placeholder="اسم الطبخة (مطلوب)" data-id="${item.id}" data-field="cookName" value="${entry.cookName || ""}">
+          </div>` : ""}
+        <div class="inputs-row">
+          <div class="field">
+            <label>الكمية المستلمة (جم)</label>
+            <input type="number" inputmode="decimal" data-id="${item.id}" data-field="received" value="${entry.received}">
+          </div>
+          <div class="field">
+            <label>الكمية المرتجعة (جم)</label>
+            <input type="number" inputmode="decimal" data-id="${item.id}" data-field="returned" value="${entry.returned}">
+          </div>
+        </div>
+        <div class="notes-row">
+          <input type="text" placeholder="ملاحظة (اختياري)" data-id="${item.id}" data-field="notes" value="${entry.notes || ""}">
+        </div>
+        <div class="badges" id="badges-${item.id}"></div>
+      `;
+      if (isItemWarnEmpty(item.id)) card.classList.add("warn-empty");
+      inner.appendChild(card);
+    });
+
+    view.appendChild(section);
   });
 
   const linksCard = document.createElement("div");
@@ -188,6 +236,33 @@ function renderEntryView() {
     inp.addEventListener(evt, onFieldChange);
   });
   visibleItems.forEach(item => updateBadges(item.id));
+  currentEntryGroups = groups;
+  currentVisibleItems = visibleItems;
+  updateCategoryCounts(groups);
+  updateProgressBar(visibleItems);
+}
+
+function cssId(str) { return str.replace(/[^a-zA-Z0-9_؀-ۿ]/g, "_"); }
+
+function updateCategoryCounts(groups) {
+  groups.forEach(group => {
+    const el = document.getElementById("catcount-" + cssId(group.category));
+    if (!el) return;
+    const confirmed = group.items.filter(it => isItemConfirmed(it.id)).length;
+    el.textContent = `${confirmed}/${group.items.length}`;
+  });
+}
+
+function updateProgressBar(visibleItems) {
+  const wrap = document.getElementById("entryProgressWrap");
+  if (!wrap) return;
+  const total = visibleItems.length;
+  const confirmed = visibleItems.filter(it => isItemConfirmed(it.id)).length;
+  const pct = total > 0 ? Math.round((confirmed / total) * 100) : 0;
+  wrap.innerHTML = `
+    <div class="progress-bar-track"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+    <div class="progress-bar-label">${confirmed} من ${total} صنف تم استلامه (${pct}%)</div>
+  `;
 }
 
 function employeeOptionsHtml() {
@@ -205,6 +280,14 @@ function onFieldChange(e) {
   if (!currentEntry[id]) currentEntry[id] = { received: "", returned: "", notes: "", cookName: "", confirmed: false };
   currentEntry[id][field] = e.target.type === "checkbox" ? e.target.checked : e.target.value;
   updateBadges(id);
+
+  const card = document.getElementById("card-" + id);
+  if (card) card.classList.toggle("warn-empty", isItemWarnEmpty(id));
+
+  const group = currentEntryGroups.find(g => g.items.some(it => it.id === id));
+  if (group) updateCategoryCounts([group]);
+  updateProgressBar(currentVisibleItems);
+
   scheduleAutoSave();
 }
 

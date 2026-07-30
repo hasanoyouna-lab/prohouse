@@ -1,7 +1,7 @@
 // Service Worker: يخزّن هيكل التطبيق (HTML/CSS/JS) محلياً حتى يفتح بدون إنترنت نهائياً.
 // لا يتدخل أبداً بطلبات API_URL (Apps Script) — تلك تمر مباشرة للشبكة ويديرها js/sync.js.
 
-const CACHE_NAME = "prohouse-shell-v2";
+const CACHE_NAME = "prohouse-shell-v3";
 const SHELL_FILES = [
   "./",
   "./index.html",
@@ -15,6 +15,7 @@ const SHELL_FILES = [
   "./js/tomorrow.js",
   "./js/report.js",
   "./js/settings.js",
+  "./js/dashboard.js",
   "./js/main.js"
 ];
 

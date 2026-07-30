@@ -213,7 +213,48 @@ function renderReport(data) {
       </div>
     `).join("");
 
-  view.innerHTML = summary + branchStatsBlock + linksBlock + `<div class="cat-title">الإجمالي حسب الصنف</div>` + (totalsCards || '<div class="empty-state">مافي أصناف تطابق هالفلترة.</div>');
+  const chartBlock = `<div class="chart-wrap"><canvas id="reportTrendChart"></canvas></div>`;
+
+  view.innerHTML = summary + chartBlock + branchStatsBlock + linksBlock + `<div class="cat-title">الإجمالي حسب الصنف</div>` + (totalsCards || '<div class="empty-state">مافي أصناف تطابق هالفلترة.</div>');
+
+  renderTrendChart(filtered.days);
+}
+
+let trendChartInstance = null;
+function renderTrendChart(days) {
+  const canvas = document.getElementById("reportTrendChart");
+  if (!canvas || typeof Chart === "undefined") return;
+
+  const byDate = {};
+  days.forEach(d => {
+    if (!byDate[d.date]) byDate[d.date] = { received: 0, returned: 0 };
+    (d.items || []).forEach(it => {
+      const r = Number(it.received), rt = Number(it.returned);
+      if (!isNaN(r)) byDate[d.date].received += r;
+      if (!isNaN(rt)) byDate[d.date].returned += rt;
+    });
+  });
+  const dates = Object.keys(byDate).sort();
+
+  if (trendChartInstance) { trendChartInstance.destroy(); trendChartInstance = null; }
+  trendChartInstance = new Chart(canvas.getContext("2d"), {
+    type: "line",
+    data: {
+      labels: dates,
+      datasets: [
+        { label: "مستلم (جم)", data: dates.map(d => byDate[d].received), borderColor: "#000000", backgroundColor: "rgba(0,0,0,.08)", tension: .3, fill: true },
+        { label: "مرتجع (جم)", data: dates.map(d => byDate[d].returned), borderColor: "#ff5151", backgroundColor: "rgba(255,81,81,.1)", tension: .3, fill: true }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom", labels: { font: { family: "Tajawal" } } } },
+      scales: {
+        x: { ticks: { font: { family: "Tajawal" }, maxRotation: 0 } },
+        y: { ticks: { font: { family: "Tajawal" } }, beginAtZero: true }
+      }
+    }
+  });
 }
 
 function exportExcel() {

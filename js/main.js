@@ -3,6 +3,7 @@
 function setActiveTab(tab) {
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
 
+  document.getElementById("dashboardView").classList.toggle("hidden", tab !== "dashboard");
   document.getElementById("entryView").classList.toggle("hidden", tab !== "entry");
   document.getElementById("tomorrowView").classList.toggle("hidden", tab !== "tomorrow");
   document.getElementById("reportContainer").classList.toggle("hidden", tab !== "report");
@@ -15,6 +16,7 @@ function setActiveTab(tab) {
   document.getElementById("saveBarEntry").classList.toggle("hidden", tab !== "entry");
   document.getElementById("saveBarTomorrow").classList.toggle("hidden", tab !== "tomorrow");
 
+  if (tab === "dashboard") { renderDashboard(); }
   if (tab === "items") { Items.load().then(renderItemsAdminView); }
   if (tab === "settings") { loadSettings().then(renderSettingsView); }
 }
@@ -34,9 +36,11 @@ function updateSyncBadge({ pending }) {
   if (pending > 0) {
     el.textContent = `🔄 ${pending} بانتظار المزامنة`;
     el.classList.remove("ok");
+    el.classList.add("pending");
   } else {
     el.textContent = "✅ كل شي متزامن";
     el.classList.add("ok");
+    el.classList.remove("pending");
   }
 }
 Sync.onStatusChange(updateSyncBadge);
@@ -59,6 +63,7 @@ updateOfflineBanner();
 updateSyncBadge({ pending: Sync.getQueue().length });
 loadSettings();
 Sync.get("getEmployees", {}, "employees");
+initDashboardTab();
 initEntryTab();
 initTomorrowTab();
 initReportTab();
