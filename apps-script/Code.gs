@@ -32,6 +32,7 @@ var SHEET_HEADERS = {
 };
 
 var DEFAULT_BRANCHES = 'الروضة,الشاطئ,عبداللطيف جميل';
+var DEFAULT_CATEGORY_ORDER = 'دجاج,لحم,بحري,كارب,السلطات,الحلويات,فطور,معدات';
 
 /**
  * شغّل هاي الدالة مرة وحدة بس (▶ Run فوق، اختارها من القائمة، وافق على الصلاحيات).
@@ -62,6 +63,7 @@ function setupEverything() {
 
   seedInitialDataIfEmpty();
   ensureDefaultSetting('branches', DEFAULT_BRANCHES);
+  ensureDefaultSetting('categoryOrder', DEFAULT_CATEGORY_ORDER);
   return 'تم إعداد كل التبويبات بنجاح';
 }
 
@@ -131,7 +133,8 @@ function seedInitialDataIfEmpty() {
       ['shortageThresholdPct', -0.20, now2],
       ['surplusThresholdPct', 0.25, now2],
       ['returnThresholdPct', 0.30, now2],
-      ['branches', DEFAULT_BRANCHES, now2]
+      ['branches', DEFAULT_BRANCHES, now2],
+      ['categoryOrder', DEFAULT_CATEGORY_ORDER, now2]
     ];
     settingsSheet.getRange(2, 1, settings.length, 3).setValues(settings);
   }
@@ -257,8 +260,16 @@ function nowIso() { return new Date().toISOString(); }
 function getItems(all) {
   var r = readRows(SHEET_NAMES.ITEMS);
   var rows = all ? r.rows : r.rows.filter(function (it) { return it.active === true || it.active === 'TRUE'; });
+
+  var settings = getSettings();
+  var orderList = (settings.categoryOrder || DEFAULT_CATEGORY_ORDER).split(',').map(function (s) { return s.trim(); });
+  function catRank(cat) {
+    var i = orderList.indexOf(cat);
+    return i === -1 ? orderList.length : i;
+  }
+
   rows.sort(function (a, b) {
-    if (a.category !== b.category) return String(a.category).localeCompare(String(b.category));
+    if (a.category !== b.category) return catRank(a.category) - catRank(b.category);
     return Number(a.sortOrder) - Number(b.sortOrder);
   });
   return rows;
@@ -448,6 +459,50 @@ function backupAll() {
     settings: readRows(SHEET_NAMES.SETTINGS).rows,
     exportedAt: nowIso()
   };
+}
+
+// ==================== نسخ احتياطي تلقائي مجدول (يومي) على Google Drive ====================
+
+var BACKUP_FOLDER_NAME = 'Pro House Backups';
+var BACKUP_RETENTION_DAYS = 30; // نحذف النسخ الأقدم من هيك تلقائياً حتى ما تمتلئ Drive
+
+function getOrCreateBackupFolder_() {
+  var folders = DriveApp.getFoldersByName(BACKUP_FOLDER_NAME);
+  if (folders.hasNext()) return folders.next();
+  return DriveApp.createFolder(BACKUP_FOLDER_NAME);
+}
+
+// هاي بتشتغل تلقائياً كل يوم (بعد ما تركّب المشغّل مرة وحدة بالأسفل) — بتحفظ نسخة JSON كاملة بتاريخها بمجلد Drive
+function backupToDrive() {
+  var folder = getOrCreateBackupFolder_();
+  var data = backupAll();
+  var stamp = nowIso().replace(/[:.]/g, '-');
+  var fileName = 'prohouse-backup-' + stamp + '.json';
+  folder.createFile(fileName, JSON.stringify(data), MimeType.PLAIN_TEXT);
+
+  // تنظيف النسخ القديمة جداً (أكثر من BACKUP_RETENTION_DAYS يوم) حتى ما تتراكم إلى ما لا نهاية
+  var cutoff = new Date(Date.now() - BACKUP_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  var files = folder.getFilesByType(MimeType.PLAIN_TEXT);
+  while (files.hasNext()) {
+    var f = files.next();
+    if (f.getName().indexOf('prohouse-backup-') === 0 && f.getDateCreated() < cutoff) f.setTrashed(true);
+  }
+  return { fileName: fileName, savedAt: nowIso() };
+}
+
+/**
+ * شغّل هاي الدالة مرة وحدة بس (▶ Run فوق) حتى تفعّل النسخ الاحتياطي اليومي التلقائي.
+ * بتركّب مشغّل زمني (Trigger) يشغّل backupToDrive() كل يوم تلقائياً — ما تحتاج تسويها يدوياً بعدها أبداً.
+ * آمنة تشتغل أكثر من مرة: ما بتكرر المشغّل لو كان موجود أصلاً.
+ */
+function createDailyBackupTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'backupToDrive') return 'المشغّل موجود أصلاً — ما ضفنا وحدة جديدة.';
+  }
+  ScriptApp.newTrigger('backupToDrive').timeBased().everyDays(1).atHour(3).create();
+  backupToDrive(); // نسخة أولى فورية حتى نتأكد إنها شغالة
+  return 'تم تفعيل النسخ الاحتياطي التلقائي اليومي (الساعة 3 فجراً تقريباً) + أخذنا نسخة أولى الآن.';
 }
 
 function restoreAll(p) {

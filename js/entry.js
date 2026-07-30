@@ -25,6 +25,7 @@ let currentEntryDate = todayStr();
 let currentEntry = {};   // itemId -> {received, returned, notes, cookName, confirmed}
 let currentDayMeta = { employeeName: "", salesReportLink: "", paymentsReportLink: "" };
 let historicalAvg = {};  // itemId -> avg
+let requestedQty = {};   // itemId -> الكمية المطلوبة (من طلبية الغد يلي انحطت أمس لهاليوم)
 let currentBranch = "";
 
 const Branch = {
@@ -49,6 +50,14 @@ function showToast(msg) {
   t.textContent = msg;
   t.classList.add("show");
   setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+// الكمية المطلوبة (من طلبية الغد يلي انحطت أمس مستهدفة هالتاريخ + هالفرع بالظبط)
+async function loadRequestedQty(date, branch) {
+  const data = await Sync.get("getTomorrowOrder", { date, branch }, "tomorrow:" + date + ":" + branch);
+  const map = {};
+  (data || []).forEach(it => { map[it.itemId] = it.qty; });
+  return map;
 }
 
 // متوسط سابق خاص بنفس الفرع بس (كل فرع له نمط استهلاك مختلف)
@@ -195,6 +204,10 @@ function renderEntryView() {
           <div class="cookname-row">
             <input type="text" placeholder="اسم الطبخة (مطلوب)" data-id="${item.id}" data-field="cookName" value="${entry.cookName || ""}">
           </div>` : ""}
+        ${requestedQty[item.id] !== undefined && requestedQty[item.id] !== "" ? `
+          <div class="badges" style="margin-top:0;">
+            <span class="badge neutral">📦 مطلوب: ${requestedQty[item.id]} ${item.unit}</span>
+          </div>` : ""}
         <div class="inputs-row">
           <div class="field">
             <label>الكمية المستلمة (جم)</label>
@@ -329,6 +342,7 @@ async function loadEntryDay(dateStr) {
   applyDayData(dayData);
 
   historicalAvg = await loadHistoricalAverages(dateStr, currentBranch);
+  requestedQty = await loadRequestedQty(dateStr, currentBranch);
   renderEntryView();
 
   const hasData = Object.keys(currentEntry).length > 0;

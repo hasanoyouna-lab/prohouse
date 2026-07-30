@@ -42,6 +42,15 @@ function renderSettingsView() {
     </div>
 
     <div class="settings-card">
+      <h3>ترتيب التصنيفات</h3>
+      <div class="field">
+        <label>رتّب التصنيفات بالفاصلة (بنفس الترتيب اللي بدك ياه يظهر بكل الشاشات والتقارير)</label>
+        <input type="text" id="setCategoryOrder" value="${currentSettings.categoryOrder || DEFAULT_CATEGORY_ORDER_FALLBACK}">
+      </div>
+      <button class="btn gold" id="saveCategoryOrderBtn">حفظ الترتيب</button>
+    </div>
+
+    <div class="settings-card">
       <h3>أعتاب التنبيهات</h3>
       <div class="inputs-row">
         <div class="field"><label>نسبة النقص</label><input type="number" step="0.01" id="setShortage" value="${currentSettings.shortageThresholdPct ?? -0.20}"></div>
@@ -87,6 +96,14 @@ function renderSettingsView() {
     Sync.cacheSet("settings", currentSettings);
     Sync.enqueue("saveSettings:branches", "saveSettings", payload);
     showToast("تم حفظ الفروع");
+  });
+
+  document.getElementById("saveCategoryOrderBtn").addEventListener("click", () => {
+    const payload = { categoryOrder: document.getElementById("setCategoryOrder").value.trim() };
+    currentSettings = { ...currentSettings, ...payload };
+    Sync.cacheSet("settings", currentSettings);
+    Sync.enqueue("saveSettings:categoryOrder", "saveSettings", payload);
+    showToast("تم حفظ ترتيب التصنيفات");
   });
 
   document.getElementById("saveThresholdsBtn").addEventListener("click", () => {

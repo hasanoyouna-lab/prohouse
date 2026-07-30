@@ -61,7 +61,7 @@ async function populateReportFilterOptions() {
   branchSel.innerHTML = `<option value="">كل الفروع</option>` + branchList().map(b => `<option value="${b}">${b}</option>`).join("");
 
   await Items.load();
-  const cats = [...new Set(Items.current.map(it => it.category).filter(Boolean))];
+  const cats = [...new Set(Items.current.map(it => it.category).filter(Boolean))].sort((a, b) => categoryRank(a) - categoryRank(b));
   document.getElementById("reportCategoryFilter").innerHTML = `<option value="">كل التصنيفات</option>` + cats.map(c => `<option value="${c}">${c}</option>`).join("");
 
   const empData = Sync.cacheGet("employees");
@@ -257,45 +257,76 @@ function renderTrendChart(days) {
   });
 }
 
-function exportExcel() {
+// ==================== أدوات مشتركة لتصدير Excel (ExcelJS — بتدعم تلوين وارتفاع صفوف حقيقي) ====================
+
+const EXCEL_ROW_HEIGHT = 22;
+const EXCEL_HEADER_FILL = "FFF7DC4E"; // أصفر الهوية
+const EXCEL_HEADER_FONT = { bold: true, color: { argb: "FF000000" } };
+
+function styleExcelSheet(sheet, colWidths) {
+  sheet.views = [{ rightToLeft: true }];
+  if (colWidths) sheet.columns = colWidths.map(w => ({ width: w }));
+  const headerRow = sheet.getRow(1);
+  headerRow.height = EXCEL_ROW_HEIGHT;
+  headerRow.eachCell(cell => {
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: EXCEL_HEADER_FILL } };
+    cell.font = EXCEL_HEADER_FONT;
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+    cell.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+  });
+  sheet.eachRow(row => {
+    row.height = EXCEL_ROW_HEIGHT;
+    row.eachCell(cell => { cell.alignment = { horizontal: "center", vertical: "middle" }; });
+  });
+}
+
+async function downloadWorkbook(workbook, filename) {
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function exportExcel() {
   if (!lastFilteredDays.length) {
     showToast("مافي بيانات للتصدير بهذه الفترة/الفلترة");
     return;
   }
-  if (typeof XLSX === "undefined") {
+  if (typeof ExcelJS === "undefined") {
     showToast("مكتبة Excel لسا ما تحمّلت، جرب مرة ثانية");
     return;
   }
 
-  const detailRows = [];
+  const workbook = new ExcelJS.Workbook();
+
+  const detailSheet = workbook.addWorksheet("التفاصيل اليومية");
+  detailSheet.addRow(["التاريخ", "الفرع", "الموظف", "تم الاستلام", "الصنف", "الوحدة", "اسم الطبخة", "المستلم", "المرتجع", "ملاحظات"]);
   lastFilteredDays.forEach(d => {
     (d.items || []).forEach(it => {
-      detailRows.push({
-        "التاريخ": d.date,
-        "الفرع": d.branch,
-        "الموظف": d.meta ? d.meta.employeeName : "",
-        "تم الاستلام": it.confirmed === true || it.confirmed === "TRUE" ? "نعم" : "لا",
-        "الصنف": it.itemName,
-        "الوحدة": it.unit,
-        "اسم الطبخة": it.cookName || "",
-        "المستلم": it.received,
-        "المرتجع": it.returned,
-        "ملاحظات": it.notes || ""
-      });
+      detailSheet.addRow([
+        d.date, d.branch, d.meta ? d.meta.employeeName : "",
+        it.confirmed === true || it.confirmed === "TRUE" ? "نعم" : "لا",
+        it.itemName, it.unit, it.cookName || "", it.received, it.returned, it.notes || ""
+      ]);
     });
   });
+  styleExcelSheet(detailSheet, [12, 14, 14, 12, 20, 10, 16, 12, 12, 22]);
 
   const { totals } = computeTotalsFromDays(lastFilteredDays);
-  const totalsRows = totals.map(t => ({
-    "الصنف": t.itemName, "الوحدة": t.unit,
-    "إجمالي مستلم": Math.round(t.totalReceived), "إجمالي مرتجع": Math.round(t.totalReturned),
-    "متوسط يومي": t.avgDaily ? Math.round(t.avgDaily) : "", "نسبة إرجاع %": t.returnPct !== null ? Math.round(t.returnPct * 100) : ""
-  }));
+  const totalsSheet = workbook.addWorksheet("الإجمالي");
+  totalsSheet.addRow(["الصنف", "الوحدة", "إجمالي مستلم", "إجمالي مرتجع", "متوسط يومي", "نسبة إرجاع %"]);
+  totals.forEach(t => {
+    totalsSheet.addRow([
+      t.itemName, t.unit, Math.round(t.totalReceived), Math.round(t.totalReturned),
+      t.avgDaily ? Math.round(t.avgDaily) : "", t.returnPct !== null ? Math.round(t.returnPct * 100) : ""
+    ]);
+  });
+  styleExcelSheet(totalsSheet, [20, 10, 14, 14, 14, 14]);
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detailRows), "التفاصيل اليومية");
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(totalsRows), "الإجمالي");
-  XLSX.writeFile(wb, `تقرير_${lastReportRange.start}_${lastReportRange.end}.xlsx`);
+  await downloadWorkbook(workbook, `تقرير_${lastReportRange.start}_${lastReportRange.end}.xlsx`);
 }
 
 // ==================== طلبية الغد (تقرير جاهز للشيف) — فرع واحد أو كل الفروع بنفس الشكل ====================
@@ -344,7 +375,7 @@ async function runTomorrowReport() {
 
   const rows = Object.values(rowsByItem)
     .filter(r => Object.values(r.qtyByBranch).some(q => q !== "" && q != null && Number(q) > 0))
-    .sort((a, b) => String(a.category).localeCompare(String(b.category)) || (Number(a.sortOrder) - Number(b.sortOrder)));
+    .sort((a, b) => categoryRank(a.category) - categoryRank(b.category) || (Number(a.sortOrder) - Number(b.sortOrder)));
 
   lastTomorrowReportRows = rows;
   renderTomorrowReport(rows, branches, date);
@@ -384,9 +415,9 @@ function renderTomorrowReport(rows, branches, date) {
   `;
 }
 
-function exportTomorrowReportExcel() {
+async function exportTomorrowReportExcel() {
   if (!lastTomorrowReportRows.length) { showToast("مافي بيانات للتصدير"); return; }
-  if (typeof XLSX === "undefined") { showToast("مكتبة Excel لسا ما تحمّلت، جرب مرة ثانية"); return; }
+  if (typeof ExcelJS === "undefined") { showToast("مكتبة Excel لسا ما تحمّلت، جرب مرة ثانية"); return; }
 
   const branches = lastTomorrowReportBranches;
   const showTotal = branches.length > 1;
@@ -395,10 +426,9 @@ function exportTomorrowReportExcel() {
     return q !== undefined && q !== null && q !== "" ? `${q} ${r.unit || ""}` : "—";
   };
 
-  const header = ["الفئة", "اسم الصنف", ...branches, ...(showTotal ? ["المجموع"] : []), "ملاحظات"];
-  const aoa = [header];
-  const merges = [];
-  let rowIdx = 1; // 0 = header
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("طلبية الغد");
+  sheet.addRow(["الفئة", "اسم الصنف", ...branches, ...(showTotal ? ["المجموع"] : []), "ملاحظات"]);
 
   const grouped = [];
   lastTomorrowReportRows.forEach(r => {
@@ -406,11 +436,12 @@ function exportTomorrowReportExcel() {
     if (last && last.category === r.category) last.items.push(r); else grouped.push({ category: r.category, items: [r] });
   });
 
+  let rowIdx = 1; // الصف 1 = العناوين (1-indexed بـ ExcelJS)
   grouped.forEach(group => {
-    const startRow = rowIdx;
+    const startRow = rowIdx + 1;
     group.items.forEach(r => {
       const total = branches.reduce((s, b) => s + (Number(r.qtyByBranch[b]) || 0), 0);
-      aoa.push([
+      sheet.addRow([
         r.category, r.name,
         ...branches.map(b => qtyCell(r, b)),
         ...(showTotal ? [`${total} ${r.unit || ""}`] : []),
@@ -418,21 +449,16 @@ function exportTomorrowReportExcel() {
       ]);
       rowIdx++;
     });
-    if (group.items.length > 1) merges.push({ s: { r: startRow, c: 0 }, e: { r: rowIdx - 1, c: 0 } });
+    if (group.items.length > 1) sheet.mergeCells(startRow, 1, rowIdx, 1);
   });
 
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws["!merges"] = merges;
-  ws["!cols"] = [
-    { wch: 14 }, { wch: 26 },
-    ...branches.map(() => ({ wch: 16 })),
-    ...(showTotal ? [{ wch: 14 }] : []),
-    { wch: 24 }
-  ];
-  ws["!rightToLeft"] = true;
+  styleExcelSheet(sheet, [14, 26, ...branches.map(() => 16), ...(showTotal ? [14] : []), 24]);
+  // خلية الفئة المدموجة: خلفية صفراء برضو (متل رأس الجدول) لتبرز الأقسام
+  sheet.eachRow((row, num) => {
+    if (num === 1) return;
+    row.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: EXCEL_HEADER_FILL } };
+    row.getCell(1).font = EXCEL_HEADER_FONT;
+  });
 
-  const wb = XLSX.utils.book_new();
-  wb.Workbook = { Views: [{ RTL: true }] };
-  XLSX.utils.book_append_sheet(wb, ws, "طلبية الغد");
-  XLSX.writeFile(wb, `طلبية_الغد_${lastTomorrowReportDate}.xlsx`);
+  await downloadWorkbook(workbook, `طلبية_الغد_${lastTomorrowReportDate}.xlsx`);
 }

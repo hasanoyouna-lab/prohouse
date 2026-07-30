@@ -96,7 +96,7 @@ function renderItemsAdminView() {
   const view = document.getElementById("itemsView");
   if (!view || view.classList.contains("hidden")) return;
 
-  const cats = [...new Set(Items.current.map(it => it.category).filter(Boolean))];
+  const cats = [...new Set(Items.current.map(it => it.category).filter(Boolean))].sort((a, b) => categoryRank(a) - categoryRank(b));
 
   view.innerHTML = `
     <div class="toolbar">
@@ -140,7 +140,7 @@ function renderItemsAdminView() {
 
   const list = document.getElementById("itemsList");
   let lastCat = null;
-  Items.current.slice().sort((a, b) => String(a.category || "").localeCompare(String(b.category || ""))).forEach(item => {
+  Items.current.slice().sort((a, b) => categoryRank(a.category) - categoryRank(b.category) || Number(a.sortOrder) - Number(b.sortOrder)).forEach(item => {
     if (item.category !== lastCat) {
       list.insertAdjacentHTML("beforeend", `<div class="cat-title">${item.category}</div>`);
       lastCat = item.category;
