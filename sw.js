@@ -1,13 +1,19 @@
 // Service Worker: يخزّن هيكل التطبيق (HTML/CSS/JS) محلياً حتى يفتح بدون إنترنت نهائياً.
 // لا يتدخل أبداً بطلبات API_URL (Apps Script) — تلك تمر مباشرة للشبكة ويديرها js/sync.js.
 
-const CACHE_NAME = "prohouse-shell-v3";
+const CACHE_NAME = "prohouse-shell-v4";
 const SHELL_FILES = [
   "./",
   "./index.html",
   "./manifest.json",
   "./css/style.css",
   "./assets/logo.png",
+  "./assets/fonts/tajawal-400-ar.woff2",
+  "./assets/fonts/tajawal-400-lat.woff2",
+  "./assets/fonts/tajawal-700-ar.woff2",
+  "./assets/fonts/tajawal-700-lat.woff2",
+  "./assets/fonts/tajawal-800-ar.woff2",
+  "./assets/fonts/tajawal-800-lat.woff2",
   "./js/config.js",
   "./js/sync.js",
   "./js/entry.js",
