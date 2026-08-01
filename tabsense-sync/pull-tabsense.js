@@ -37,7 +37,7 @@ const UMM_ALI_PRODUCT_NAME = "ام علي";
 const UMM_ALI_TARGET_CATEGORY = "فطور";
 
 function getTargetDateStr() {
-  // إذا تم تحديد تاريخ معين بالأمر أو البيئة نسحبه، وإلا نأخذ يوم أمس كافتراضي
+  // إذا تم تحديد تاريخ معين بالأمر نسحبه، وإلا نأخذ تاريخ اليوم نفسه كافتراضي
   const customDate = process.argv[2]; // مثال: node pull-tabsense.js 07/30/2026
   if (customDate && /\d{2}\/\d{2}\/\d{4}/.test(customDate)) {
     const parts = customDate.split("/");
@@ -45,7 +45,6 @@ function getTargetDateStr() {
   }
 
   const d = new Date();
-  d.setDate(d.getDate() - 1);
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   const yyyy = d.getFullYear();
