@@ -81,9 +81,16 @@ function updateOfflineBanner() {
 window.addEventListener("online", updateOfflineBanner);
 window.addEventListener("offline", updateOfflineBanner);
 
-// ---- تسجيل Service Worker (يخلي التطبيق نفسه يفتح بدون إنترنت) ----
-if ("serviceWorker" in navigator && location.protocol !== "file:") {
-  navigator.serviceWorker.register("sw.js").catch((e) => console.warn("SW register failed:", e));
+// ---- تسجيل Service Worker و Manifest (فقط عند النشر على سيرفر HTTP/HTTPS لتجنب أخطاء CORS عند الفتح المباشر) ----
+if (location.protocol !== "file:") {
+  const manifestLink = document.createElement("link");
+  manifestLink.rel = "manifest";
+  manifestLink.href = "manifest.json";
+  document.head.appendChild(manifestLink);
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch((e) => console.warn("SW register failed:", e));
+  }
 }
 
 // ---- تسجيل الدخول ----
