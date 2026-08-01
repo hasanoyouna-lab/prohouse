@@ -7,6 +7,7 @@
  *   TomorrowOrders: date, branch, itemId, itemName, unit, qty, notes, employeeName, savedAt
  *   Employees:      name, active, id, pin, role, branches   (roles: owner, manager, chef, employee)
  *   Sessions:       token, employeeId, createdAt, expiresAt
+ *   TabsenseSales:  date, branch, category, qty, importedAt
  *   Settings:       key, value
  *
  * Deploy: Deploy > New deployment > Web app > Execute as: Me > Who has access: Anyone.
@@ -21,6 +22,7 @@ var SHEET_NAMES = {
   TOMORROW: 'TomorrowOrders',
   EMPLOYEES: 'Employees',
   SESSIONS: 'Sessions',
+  TABSENSE: 'TabsenseSales',
   SETTINGS: 'Settings'
 };
 
@@ -34,6 +36,7 @@ var SHEET_HEADERS = {
   TomorrowOrders: ['date', 'branch', 'itemId', 'itemName', 'unit', 'qty', 'notes', 'employeeName', 'savedAt'],
   Employees: ['name', 'active', 'id', 'pin', 'role', 'branches'],
   Sessions: ['token', 'employeeId', 'createdAt', 'expiresAt'],
+  TabsenseSales: ['date', 'branch', 'category', 'qty', 'importedAt'],
   Settings: ['key', 'value', 'updatedAt']
 };
 
@@ -84,6 +87,7 @@ function setupEverything() {
   migrateEmployees_();
   ensureDefaultSetting('branches', DEFAULT_BRANCHES);
   ensureDefaultSetting('categoryOrder', DEFAULT_CATEGORY_ORDER);
+  ensureDefaultSetting('integrationToken', Utilities.getUuid());
   return 'تم إعداد كل التبويبات بنجاح';
 }
 
@@ -214,6 +218,11 @@ function doGet(e) {
         data = getEmployees();
         break;
       case 'getSettings': data = getSettings(); break;
+      case 'getSalesByCategory':
+        if (employee.role === 'employee') throw new Error('غير مصرح');
+        requireBranchAccess_(employee, e.parameter.branch);
+        data = getSalesByCategory(e.parameter.start, e.parameter.end, e.parameter.branch);
+        break;
       case 'backupAll':
         if (employee.role !== 'owner') throw new Error('غير مصرح');
         data = backupAll();
@@ -234,6 +243,12 @@ function doPost(e) {
 
     if (body.action === 'login') return jsonOut({ ok: true, data: login(body.payload && body.payload.pin) });
     if (body.action === 'logout') return jsonOut({ ok: true, data: logout(body.token) });
+
+    // مصادقة منفصلة عن جلسات الموظفين — لسكربتات الأتمتة (مثل سحب تابسنس) اللي بتشتغل بدون تسجيل دخول بشري
+    if (body.action === 'importSalesByCategory') {
+      requireIntegrationToken_(body.integrationToken);
+      return jsonOut({ ok: true, data: importSalesByCategory(body.payload) });
+    }
 
     var employee = requireSession_(body.token);
     var data;
@@ -338,6 +353,14 @@ function requireSession_(token) {
     id: emp.id, name: emp.name, role: emp.role,
     branches: (emp.branches || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean)
   };
+}
+
+// توكن ثابت لسكربتات الأتمتة (مو جلسة موظف) — يتولّد تلقائياً أول مرة setupEverything، وتقدر تشوفه بتبويب Settings
+function requireIntegrationToken_(token) {
+  var settings = getSettings();
+  if (!token || !settings.integrationToken || token !== settings.integrationToken) {
+    throw new Error('integration token غير صحيح');
+  }
 }
 
 function hasBranchAccess_(emp, branch) {
@@ -599,6 +622,24 @@ function saveTomorrowOrder(p) {
   return { date: p.date, branch: p.branch, savedAt: savedAt };
 }
 
+// ==================== مبيعات تابسنس (مطابقة مع الاستلام) ====================
+
+// بيستبدل بيانات نفس اليوم+الفرع كل مرة ينسحب فيها (last-write-wins، نفس نمط باقي البيانات اليومية)
+function importSalesByCategory(p) {
+  deleteRowsWhere(SHEET_NAMES.TABSENSE, function (row) { return row.date === p.date && row.branch === p.branch; });
+  var importedAt = nowIso();
+  (p.rows || []).forEach(function (r) {
+    appendRow(SHEET_NAMES.TABSENSE, { date: p.date, branch: p.branch, category: r.category, qty: r.qty, importedAt: importedAt });
+  });
+  return { date: p.date, branch: p.branch, count: (p.rows || []).length, importedAt: importedAt };
+}
+
+function getSalesByCategory(start, end, branch) {
+  return readRows(SHEET_NAMES.TABSENSE).rows.filter(function (r) {
+    return r.date >= start && r.date <= end && r.branch === branch;
+  });
+}
+
 // ==================== Employees / Settings ====================
 
 function getEmployees() {
@@ -639,6 +680,7 @@ function backupAll() {
     dayMeta: readRows(SHEET_NAMES.DAYMETA).rows,
     tomorrowOrders: readRows(SHEET_NAMES.TOMORROW).rows,
     employees: readRows(SHEET_NAMES.EMPLOYEES).rows,
+    tabsenseSales: readRows(SHEET_NAMES.TABSENSE).rows,
     settings: readRows(SHEET_NAMES.SETTINGS).rows,
     exportedAt: nowIso()
   };
@@ -703,6 +745,7 @@ function restoreAll(p) {
   replaceSheet(SHEET_NAMES.DAYMETA, p.dayMeta);
   replaceSheet(SHEET_NAMES.TOMORROW, p.tomorrowOrders);
   replaceSheet(SHEET_NAMES.EMPLOYEES, p.employees);
+  replaceSheet(SHEET_NAMES.TABSENSE, p.tabsenseSales);
   replaceSheet(SHEET_NAMES.SETTINGS, p.settings);
   return { restoredAt: nowIso() };
 }

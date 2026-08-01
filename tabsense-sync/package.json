@@ -1,0 +1,14 @@
+{
+  "name": "prohouse-tabsense-sync",
+  "version": "1.0.0",
+  "private": true,
+  "description": "سحب يومي غير رسمي لتقرير المبيعات حسب التصنيف من تابسنس وإرساله لموقع Pro House",
+  "main": "pull-tabsense.js",
+  "scripts": {
+    "start": "node pull-tabsense.js",
+    "install-browser": "playwright install chromium"
+  },
+  "dependencies": {
+    "playwright": "^1.47.0"
+  }
+}

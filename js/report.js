@@ -215,9 +215,93 @@ function renderReport(data) {
 
   const chartBlock = `<div class="chart-wrap"><canvas id="reportTrendChart"></canvas></div>`;
 
-  view.innerHTML = summary + chartBlock + branchStatsBlock + linksBlock + `<div class="cat-title">الإجمالي حسب الصنف</div>` + (totalsCards || '<div class="empty-state">مافي أصناف تطابق هالفلترة.</div>');
+  view.innerHTML = summary + chartBlock + branchStatsBlock + linksBlock
+    + '<div id="mealsSummaryBlock"></div>'
+    + `<div class="cat-title">الإجمالي حسب الصنف</div>` + (totalsCards || '<div class="empty-state">مافي أصناف تطابق هالفلترة.</div>');
 
   renderTrendChart(filtered.days);
+  renderMealsSummary(filtered.days);
+}
+
+// ==================== ملخص الوجبات: مستلم (من عندنا) مقابل مباع (من تابسنس) ====================
+
+async function renderMealsSummary(days) {
+  const container = document.getElementById("mealsSummaryBlock");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const branches = [...new Set(days.map(d => d.branch))];
+  if (!branches.length) return;
+  const { start, end } = lastReportRange;
+
+  const salesArrays = await Promise.all(
+    branches.map(b => Sync.get("getSalesByCategory", { start, end, branch: b }, "sales:" + start + ":" + end + ":" + b))
+  );
+
+  const soldByCat = {};
+  let hasAnySalesData = false;
+  salesArrays.forEach(arr => (arr || []).forEach(r => {
+    hasAnySalesData = true;
+    soldByCat[r.category] = (soldByCat[r.category] || 0) + Number(r.qty || 0);
+  }));
+
+  const receivedGramsByCat = {};
+  days.forEach(d => (d.items || []).forEach(it => {
+    const item = Items.byId(it.itemId);
+    if (!item || !isMealCategory(item.category)) return;
+    const r = Number(it.received);
+    if (!isNaN(r)) receivedGramsByCat[item.category] = (receivedGramsByCat[item.category] || 0) + r;
+  }));
+
+  const relevantCats = MEAL_CATEGORIES.filter(c => receivedGramsByCat[c] !== undefined || soldByCat[c] !== undefined);
+  if (!relevantCats.length) return;
+
+  let totalReceivedMeals = 0, totalSoldMeals = 0, allHaveSales = true;
+  const rows = relevantCats.map(cat => {
+    const receivedMeals = Number(mealsCount(receivedGramsByCat[cat] || 0)) || 0;
+    const hasSales = soldByCat[cat] !== undefined;
+    const sold = hasSales ? soldByCat[cat] : 0;
+    const remaining = receivedMeals - sold;
+    totalReceivedMeals += receivedMeals;
+    if (hasSales) totalSoldMeals += sold; else allHaveSales = false;
+    return { cat, receivedMeals, sold, remaining, hasSales, matched: Math.abs(remaining) < 1 };
+  });
+
+  const totalRemaining = totalReceivedMeals - totalSoldMeals;
+
+  container.innerHTML = `
+    <div class="cat-title">ملخص الوجبات (دجاج / لحم / بحري)</div>
+    <div class="dash-tile" style="margin-bottom:10px;">
+      <div>
+        <div class="lbl">إجمالي الوجبات المستلمة</div>
+        <div class="big">${totalReceivedMeals.toFixed(1)}</div>
+      </div>
+      <div>
+        <div class="lbl">إجمالي الوجبات المباعة${allHaveSales ? "" : " (بيانات جزئية)"}</div>
+        <div class="big">${allHaveSales || hasAnySalesData ? totalSoldMeals.toFixed(1) : "—"}</div>
+      </div>
+      <div>
+        <div class="lbl">المتبقي</div>
+        <div class="big">${allHaveSales ? totalRemaining.toFixed(1) : "—"}</div>
+      </div>
+    </div>
+    <div class="order-table-wrap">
+      <table class="order-table">
+        <thead><tr><th>التصنيف</th><th>الوجبات المستلمة</th><th>الوجبات المباعة</th><th>المتبقي</th><th>الحالة</th></tr></thead>
+        <tbody>${rows.map(r => `
+          <tr>
+            <td class="cat-cell">${r.cat}</td>
+            <td>${r.receivedMeals.toFixed(1)}</td>
+            <td>${r.hasSales ? r.sold.toFixed(1) : "—"}</td>
+            <td>${r.hasSales ? r.remaining.toFixed(1) : "—"}</td>
+            <td>${!r.hasSales
+              ? '<span class="badge neutral">لا يوجد بيانات مبيعات لهذا الفرع/اليوم</span>'
+              : (r.matched ? '<span class="badge ok">✅ مطابق</span>' : '<span class="badge warn">⚠ فيه هدر/فرق محتمل</span>')}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
 let trendChartInstance = null;
