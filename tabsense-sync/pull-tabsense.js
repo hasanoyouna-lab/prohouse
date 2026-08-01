@@ -35,7 +35,10 @@ const CATEGORY_MAP = {
   "الساندويتشات": "ساندويتشات",
   "ساندوتشات": "ساندويتشات",
   "الساندوتشات": "ساندويتشات",
-  "Sandwiches": "ساندويتشات"
+  "Sandwiches": "ساندويتشات",
+  "فطور": "ساندويتشات",
+  "الفطور": "ساندويتشات",
+  "Breakfast": "ساندويتشات"
 };
 
 const UMM_ALI_PRODUCT_NAME = "ام علي";
@@ -178,9 +181,18 @@ async function run() {
     const categoryRows = await extractCategoryTable(page);
     console.log("جدول التصنيفات المستخرج:", categoryRows);
 
-    const mappedRows = categoryRows
-      .filter(r => CATEGORY_MAP[r.category])
-      .map(r => ({ category: CATEGORY_MAP[r.category], qty: r.qty }));
+    const mappedRows = [];
+    categoryRows.forEach(r => {
+      const targetCat = CATEGORY_MAP[r.category];
+      if (targetCat) {
+        const existing = mappedRows.find(m => m.category === targetCat);
+        if (existing) {
+          existing.qty += r.qty;
+        } else {
+          mappedRows.push({ category: targetCat, qty: r.qty });
+        }
+      }
+    });
 
     // ---- 2) تقرير "المبيعات حسب المنتج" لـ "أم علي" ----
     console.log("🍩 جاري سحب تقرير المبيعات حسب المنتج لمنتج (أم علي)...");
