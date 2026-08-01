@@ -291,24 +291,6 @@ function renderEntryView() {
     });
   }
 
-  const linksCard = document.createElement("div");
-  linksCard.className = "item-card";
-  linksCard.innerHTML = `
-    <div class="notes-row">
-      <input type="url" id="salesLink" placeholder="رابط تقرير المبيعات حسب المنتج (Foodics/Tabsense)" value="${currentDayMeta.salesReportLink || ""}" ${ro}>
-    </div>
-    <div class="notes-row">
-      <input type="url" id="paymentsLink" placeholder="رابط تقرير المدفوعات" value="${currentDayMeta.paymentsReportLink || ""}" ${ro}>
-    </div>
-  `;
-  view.appendChild(linksCard);
-  if (!Auth.isViewOnlyEntry()) document.getElementById("salesLink").addEventListener("input", scheduleAutoSave);
-  document.getElementById("paymentsLink").addEventListener("input", scheduleAutoSave);
-
-  view.querySelectorAll("input[data-field]").forEach(inp => {
-    const evt = inp.type === "checkbox" ? "change" : "input";
-    inp.addEventListener(evt, onFieldChange);
-  });
   visibleItems.forEach(item => updateBadges(item.id));
   currentEntryGroups = groups;
   currentVisibleItems = visibleItems;
@@ -432,8 +414,8 @@ function saveEntryNow(showStatus) {
   const employeeName = (Auth.getEmployee() || {}).name || "";
   const branch = currentBranch || "";
 
-  const salesReportLink = document.getElementById("salesLink").value.trim();
-  const paymentsReportLink = document.getElementById("paymentsLink").value.trim();
+  const salesReportLink = document.getElementById("salesLink") ? document.getElementById("salesLink").value.trim() : "";
+  const paymentsReportLink = document.getElementById("paymentsLink") ? document.getElementById("paymentsLink").value.trim() : "";
 
   const items = Items.current
     .filter(it => currentEntry[it.id] && (currentEntry[it.id].received !== "" || currentEntry[it.id].returned !== "" || currentEntry[it.id].notes || currentEntry[it.id].confirmed))
