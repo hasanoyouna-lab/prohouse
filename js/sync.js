@@ -42,7 +42,7 @@ const Sync = (() => {
       try {
         const qs = new URLSearchParams({ action, token: Auth.getToken(), ...(params || {}) }).toString();
         const controller = new AbortController();
-        const t = setTimeout(() => controller.abort(), 10000);
+        const t = setTimeout(() => controller.abort(), 30000);
         const res = await fetch(API_URL + "?" + qs, { signal: controller.signal });
         clearTimeout(t);
         const json = await res.json();
@@ -54,7 +54,9 @@ const Sync = (() => {
         if (onFresh) onFresh(json.data);
         return json.data;
       } catch (e) {
-        console.warn("Sync.get background fetch failed:", action, e);
+        if (e.name !== "AbortError") {
+          console.debug("Sync.get background fetch note:", action, e.message || e);
+        }
         return null;
       }
     })();
