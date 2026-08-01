@@ -1,3 +1,4 @@
 config.json
 downloads/
 node_modules/
+*.log
