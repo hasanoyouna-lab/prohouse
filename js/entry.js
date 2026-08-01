@@ -291,6 +291,11 @@ function renderEntryView() {
     });
   }
 
+  view.querySelectorAll("input[data-field]").forEach(inp => {
+    const evt = inp.type === "checkbox" ? "change" : "input";
+    inp.addEventListener(evt, onFieldChange);
+  });
+
   visibleItems.forEach(item => updateBadges(item.id));
   currentEntryGroups = groups;
   currentVisibleItems = visibleItems;
