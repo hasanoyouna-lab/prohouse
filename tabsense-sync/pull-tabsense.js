@@ -30,11 +30,16 @@ const CATEGORY_MAP = {
   "Meat": "لحم",
   "Meat Dishes": "لحم",
   "Seafood": "بحري",
-  "Seafood Dishes": "بحري"
+  "Seafood Dishes": "بحري",
+  "ساندويتشات": "ساندويتشات",
+  "الساندويتشات": "ساندويتشات",
+  "ساندوتشات": "ساندويتشات",
+  "الساندوتشات": "ساندويتشات",
+  "Sandwiches": "ساندويتشات"
 };
 
 const UMM_ALI_PRODUCT_NAME = "ام علي";
-const UMM_ALI_TARGET_CATEGORY = "فطور";
+const UMM_ALI_TARGET_CATEGORY = "ساندويتشات";
 
 function getTargetDateStr() {
   // إذا تم تحديد تاريخ معين بالأمر نسحبه، وإلا نأخذ تاريخ اليوم نفسه كافتراضي

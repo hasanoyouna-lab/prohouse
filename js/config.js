@@ -7,7 +7,7 @@ const APP_VERSION = "2.1.0";
 const DEFAULT_BRANCHES_FALLBACK = "الروضة,الشاطئ,عبداللطيف جميل";
 
 // ترتيب افتراضي للتصنيفات (يُستبدل بقيمة إعداد "categoryOrder" من شاشة الإعدادات لو محفوظة — قابل للتعديل بالكامل من هناك)
-const DEFAULT_CATEGORY_ORDER_FALLBACK = "دجاج,لحم,بحري,كارب,السلطات,الحلويات,فطور,معدات";
+const DEFAULT_CATEGORY_ORDER_FALLBACK = "دجاج,لحم,بحري,ساندويتشات,كارب,السلطات,الحلويات,فطور,معدات";
 function categoryOrderList() {
   const raw = (typeof currentSettings !== "undefined" && currentSettings.categoryOrder) || DEFAULT_CATEGORY_ORDER_FALLBACK;
   return raw.split(",").map(s => s.trim()).filter(Boolean);
