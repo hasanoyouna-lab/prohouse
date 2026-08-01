@@ -67,6 +67,15 @@ function checkedBranches(container) {
   return [...container.querySelectorAll('input[type="checkbox"]:checked')].map(cb => cb.value).join(",");
 }
 
+// غير المالك بيقدر يتحكم بس بأصناف موسومة بفرع واحد من فروعه — بديل عن الـ checkboxes متعددة الاختيار
+function branchLockedFieldHtml(inputId, current) {
+  const mine = allowedBranchList();
+  if (mine.length <= 1) {
+    return `<div class="readonly-field">${mine[0] || "لا يوجد فرع مرتبط بحسابك"}</div><input type="hidden" id="${inputId}" value="${mine[0] || ""}">`;
+  }
+  return `<select id="${inputId}">${mine.map(b => `<option value="${b}" ${b === current ? "selected" : ""}>${b}</option>`).join("")}</select>`;
+}
+
 // قائمة تصنيف منسدلة من التصنيفات الموجودة فعلاً (بدون تكرار) + خيار "تصنيف جديد" لو احتجنا
 function categorySelectHtml(cats, selected) {
   return `
@@ -96,9 +105,18 @@ function renderItemsAdminView() {
   const view = document.getElementById("itemsView");
   if (!view || view.classList.contains("hidden")) return;
 
+  const isOwner = Auth.isOwner();
+  const mine = allowedBranchList();
+  // غير المالك بيشوف بس أصناف موسومة بفرع واحد من فروعه (اللي هو أضافها) — مو الكتالوج المشترك كامل
+  const visibleItems = isOwner ? Items.current : Items.current.filter(it => {
+    const b = itemBranches(it);
+    return b.length === 1 && mine.includes(b[0]);
+  });
+
   const cats = [...new Set(Items.current.map(it => it.category).filter(Boolean))].sort((a, b) => categoryRank(a) - categoryRank(b));
 
   view.innerHTML = `
+    ${!isOwner ? '<div class="offline-banner">هون بس الأصناف اللي ضفتها إلك لفرعك — الكتالوج المشترك بيديره المالك</div>' : ""}
     <div class="toolbar">
       <button class="btn primary" id="addItemBtn">+ إضافة صنف جديد</button>
     </div>
@@ -107,6 +125,7 @@ function renderItemsAdminView() {
       <div class="field" id="newCatGroup"><label>التصنيف</label>${categorySelectHtml(cats, "")}</div>
       <div class="field"><label>اسم الصنف</label><input type="text" id="newName"></div>
       <div class="field"><label>الوحدة</label><input type="text" id="newUnit"></div>
+      ${isOwner ? `
       <div class="field" style="display:flex;align-items:center;gap:8px;">
         <input type="checkbox" id="newCustomName" style="width:auto;">
         <label style="margin:0;" for="newCustomName">اسم الطبخة يُكتب يدوياً كل مرة (مثل دجاج الشيف/لحم الشيف)</label>
@@ -114,7 +133,8 @@ function renderItemsAdminView() {
       <div class="field">
         <label>يظهر بشاشة الاستلام لهاي الفروع بس (اترك الكل بدون تحديد = يظهر عند الكل)</label>
         <div class="badges" id="newBranchChecks">${branchCheckboxesHtml([])}</div>
-      </div>
+      </div>` : `
+      <div class="field"><label>الفرع</label>${branchLockedFieldHtml("newBranchLocked", mine[0] || "")}</div>`}
       <button class="btn gold" id="saveNewItemBtn">حفظ الصنف</button>
     </div>
     <div id="itemsList"></div>
@@ -129,9 +149,10 @@ function renderItemsAdminView() {
     const category = categoryValue(document.getElementById("newCatGroup"));
     const name = document.getElementById("newName").value.trim();
     const unit = document.getElementById("newUnit").value.trim();
-    const hasCustomName = document.getElementById("newCustomName").checked;
-    const branches = checkedBranches(document.getElementById("newBranchChecks"));
+    const hasCustomName = isOwner ? document.getElementById("newCustomName").checked : false;
+    const branches = isOwner ? checkedBranches(document.getElementById("newBranchChecks")) : document.getElementById("newBranchLocked").value;
     if (!category || !name) { showToast("لازم تعبي التصنيف واسم الصنف"); return; }
+    if (!isOwner && !branches) { showToast("ما في فرع مرتبط بحسابك"); return; }
     Items.save({ category, name, unit, hasCustomName, branches, sortOrder: Items.current.length + 1 });
     document.getElementById("itemAddForm").classList.add("hidden");
     renderItemsAdminView();
@@ -140,7 +161,7 @@ function renderItemsAdminView() {
 
   const list = document.getElementById("itemsList");
   let lastCat = null;
-  Items.current.slice().sort((a, b) => categoryRank(a.category) - categoryRank(b.category) || Number(a.sortOrder) - Number(b.sortOrder)).forEach(item => {
+  visibleItems.slice().sort((a, b) => categoryRank(a.category) - categoryRank(b.category) || Number(a.sortOrder) - Number(b.sortOrder)).forEach(item => {
     if (item.category !== lastCat) {
       list.insertAdjacentHTML("beforeend", `<div class="cat-title">${item.category}</div>`);
       lastCat = item.category;
@@ -155,6 +176,7 @@ function renderItemsAdminView() {
       <div class="inputs-row" style="margin-top:8px;">
         <div class="field" data-cat-group><label>التصنيف</label>${categorySelectHtml(cats, item.category)}</div>
       </div>
+      ${isOwner ? `
       <div class="badges">
         <label class="badge neutral" style="cursor:pointer;">
           <input type="checkbox" data-f="hasCustomName" ${item.hasCustomName ? "checked" : ""} style="width:auto;margin-left:4px;">
@@ -164,7 +186,8 @@ function renderItemsAdminView() {
       <div class="field" style="margin-top:8px;">
         <label>يظهر بشاشة الاستلام لهاي الفروع بس (بدون تحديد = يظهر عند الكل)</label>
         <div class="badges" data-branch-checks>${branchCheckboxesHtml(itemBranches(item))}</div>
-      </div>
+      </div>` : `
+      <div class="field" style="margin-top:8px;"><label>الفرع</label>${branchLockedFieldHtml("editBranchLocked-" + item.id, itemBranches(item)[0] || mine[0] || "")}</div>`}
       <div class="toolbar" style="margin-top:10px;margin-bottom:0;">
         <button class="btn gold" data-act="save">حفظ التعديل</button>
         <button class="btn danger" data-act="del">حذف الصنف</button>
@@ -177,8 +200,8 @@ function renderItemsAdminView() {
         name: card.querySelector('[data-f="name"]').value.trim(),
         unit: card.querySelector('[data-f="unit"]').value.trim(),
         category: categoryValue(card.querySelector("[data-cat-group]")),
-        hasCustomName: card.querySelector('[data-f="hasCustomName"]').checked,
-        branches: checkedBranches(card.querySelector('[data-branch-checks]')),
+        hasCustomName: isOwner ? card.querySelector('[data-f="hasCustomName"]').checked : !!item.hasCustomName,
+        branches: isOwner ? checkedBranches(card.querySelector('[data-branch-checks]')) : document.getElementById("editBranchLocked-" + item.id).value,
         sortOrder: item.sortOrder
       };
       if (!updated.category || !updated.name) { showToast("لازم تعبي التصنيف واسم الصنف"); return; }
@@ -195,7 +218,7 @@ function renderItemsAdminView() {
     list.appendChild(card);
   });
 
-  if (!Items.current.length) {
+  if (!visibleItems.length) {
     list.innerHTML = '<div class="empty-state">لا يوجد أصناف بعد.</div>';
   }
 }

@@ -17,30 +17,35 @@ function renderTomorrowView() {
   if (!view) return;
   view.innerHTML = "";
 
+  const myBranches = allowedBranchList();
+  const branchLocked = myBranches.length <= 1;
+  const ro = Auth.isViewOnlyTomorrow() ? "disabled" : "";
+
   const metaCard = document.createElement("div");
   metaCard.className = "item-card";
   metaCard.innerHTML = `
     <div class="inputs-row">
       <div class="field">
         <label>الموظف</label>
-        <select id="tomorrowEmployeeSelect">${employeeOptionsHtml()}</select>
+        <div class="readonly-field">${Auth.getEmployee() ? Auth.getEmployee().name : ""}</div>
       </div>
       <div class="field">
         <label>الفرع</label>
-        <select id="tomorrowBranchSelect">${branchOptionsHtml(currentTomorrowBranch)}</select>
+        ${branchLocked
+          ? `<div class="readonly-field">${myBranches[0] || "لا يوجد فرع مرتبط بحسابك"}</div>`
+          : `<select id="tomorrowBranchSelect">${branchOptionsHtml(currentTomorrowBranch)}</select>`}
       </div>
     </div>
+    ${Auth.isViewOnlyTomorrow() ? '<div class="badges"><span class="badge neutral">👁 عرض فقط — الشيف ما بيعدّل هون</span></div>' : ""}
   `;
   view.appendChild(metaCard);
-  document.getElementById("tomorrowEmployeeSelect").addEventListener("change", (e) => {
-    Employee.set(e.target.value);
-    scheduleTomorrowAutoSave();
-  });
-  document.getElementById("tomorrowBranchSelect").addEventListener("change", (e) => {
-    currentTomorrowBranch = e.target.value;
-    Branch.set(currentTomorrowBranch);
-    loadTomorrowOrder(currentTomorrowDate);
-  });
+  if (!branchLocked) {
+    document.getElementById("tomorrowBranchSelect").addEventListener("change", (e) => {
+      currentTomorrowBranch = e.target.value;
+      Branch.set(currentTomorrowBranch);
+      loadTomorrowOrder(currentTomorrowDate);
+    });
+  }
 
   if (!Items.current.length) {
     view.insertAdjacentHTML("beforeend", '<div class="empty-state">لا يوجد أصناف بعد. ضيف أصناف من تاب "إدارة الأصناف"، أو تأكد إن الباك اند مربوط (js/config.js).</div>');
@@ -96,11 +101,11 @@ function renderTomorrowView() {
         <div class="inputs-row">
           <div class="field">
             <label>الكمية المطلوبة</label>
-            <input type="number" inputmode="decimal" data-id="${item.id}" data-field="qty" value="${entry.qty}">
+            <input type="number" inputmode="decimal" data-id="${item.id}" data-field="qty" value="${entry.qty}" ${ro}>
           </div>
         </div>
         <div class="notes-row">
-          <input type="text" placeholder="ملاحظة (اختياري)" data-id="${item.id}" data-field="notes" value="${entry.notes || ""}">
+          <input type="text" placeholder="ملاحظة (اختياري)" data-id="${item.id}" data-field="notes" value="${entry.notes || ""}" ${ro}>
         </div>
       `;
       inner.appendChild(card);
@@ -109,9 +114,11 @@ function renderTomorrowView() {
     view.appendChild(section);
   });
 
-  view.querySelectorAll("input[data-field]").forEach(inp => {
-    inp.addEventListener("input", onTomorrowFieldChange);
-  });
+  if (!Auth.isViewOnlyTomorrow()) {
+    view.querySelectorAll("input[data-field]").forEach(inp => {
+      inp.addEventListener("input", onTomorrowFieldChange);
+    });
+  }
 
   currentTomorrowGroups = groups;
   updateTomorrowCategoryCounts(groups);
@@ -154,6 +161,10 @@ function onTomorrowFieldChange(e) {
 
 async function loadTomorrowOrder(dateStr) {
   currentTomorrowBranch = Branch.get();
+  const myBranches = allowedBranchList();
+  if (myBranches.length === 1 && currentTomorrowBranch !== myBranches[0]) currentTomorrowBranch = myBranches[0];
+  if (currentTomorrowBranch && !Auth.canSeeAllBranches() && !myBranches.includes(currentTomorrowBranch)) currentTomorrowBranch = myBranches[0] || "";
+  Branch.set(currentTomorrowBranch);
   await Items.load();
 
   if (!currentTomorrowBranch) {
@@ -186,7 +197,9 @@ function applyTomorrowData(list) {
 
 // حفظ فوري بدون انتظار ضغطة زر — نفس فلسفة شاشة طلبية اليوم
 function saveTomorrowNow(showStatus) {
-  const employeeName = document.getElementById("tomorrowEmployeeSelect") ? document.getElementById("tomorrowEmployeeSelect").value : Employee.get();
+  if (Auth.isViewOnlyTomorrow()) return; // الشيف عرض بس، ما بيحفظ
+
+  const employeeName = (Auth.getEmployee() || {}).name || "";
   const branch = currentTomorrowBranch || "";
 
   const items = Items.current
@@ -199,7 +212,6 @@ function saveTomorrowNow(showStatus) {
 
   const missing = [];
   if (!branch) missing.push("الفرع");
-  if (!employeeName) missing.push("الموظف");
   const savedAtText = new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
   document.getElementById("tomorrowStatus").textContent = missing.length
     ? `✅ محفوظ (بدون ${missing.join(" و")} — كمّلهم أول ما تقدر) — ${savedAtText}`

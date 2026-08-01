@@ -5,7 +5,8 @@
  *   DailyEntries:   date, branch, itemId, itemName, unit, confirmed, received, returned, cookName, notes, savedAt
  *   DayMeta:        date, branch, employeeName, salesReportLink, paymentsReportLink, savedAt, updatedAt
  *   TomorrowOrders: date, branch, itemId, itemName, unit, qty, notes, employeeName, savedAt
- *   Employees:      name, active
+ *   Employees:      name, active, id, pin, role, branches   (roles: owner, manager, chef, employee)
+ *   Sessions:       token, employeeId, createdAt, expiresAt
  *   Settings:       key, value
  *
  * Deploy: Deploy > New deployment > Web app > Execute as: Me > Who has access: Anyone.
@@ -19,25 +20,43 @@ var SHEET_NAMES = {
   DAYMETA: 'DayMeta',
   TOMORROW: 'TomorrowOrders',
   EMPLOYEES: 'Employees',
+  SESSIONS: 'Sessions',
   SETTINGS: 'Settings'
 };
 
+// ملاحظة: بعمود Employees حافظنا على ترتيب name/active بمكانه الأصلي وضفنا الأعمدة الجديدة
+// آخر الصف بدل ما نعيد ترتيبها بالكامل — تغيير ترتيب الأعمدة الموجودة بيخرب البيانات الحالية
+// (نفس مشكلة "column-shift" اللي انصلحت قبل هيك بمشروع تاني).
 var SHEET_HEADERS = {
   Items: ['id', 'category', 'name', 'unit', 'hasCustomName', 'branches', 'active', 'sortOrder', 'updatedAt'],
   DailyEntries: ['date', 'branch', 'itemId', 'itemName', 'unit', 'confirmed', 'received', 'returned', 'cookName', 'notes', 'savedAt'],
   DayMeta: ['date', 'branch', 'employeeName', 'salesReportLink', 'paymentsReportLink', 'savedAt', 'updatedAt'],
   TomorrowOrders: ['date', 'branch', 'itemId', 'itemName', 'unit', 'qty', 'notes', 'employeeName', 'savedAt'],
-  Employees: ['name', 'active'],
+  Employees: ['name', 'active', 'id', 'pin', 'role', 'branches'],
+  Sessions: ['token', 'employeeId', 'createdAt', 'expiresAt'],
   Settings: ['key', 'value', 'updatedAt']
 };
 
 var DEFAULT_BRANCHES = 'الروضة,الشاطئ,عبداللطيف جميل';
 var DEFAULT_CATEGORY_ORDER = 'دجاج,لحم,بحري,كارب,السلطات,الحلويات,فطور,معدات';
+var SESSION_DAYS = 30;
+
+// أرقام سرية افتراضية سهلة — كل موظف لازم يعرفها ويقدر يغيّرها لاحقاً من داخل الموقع.
+// هاد التعيين بيصير مرة وحدة بس وقت الإعداد؛ أي تعديل يدوي بالشيت بعدها ما بينلمس.
+var EMPLOYEE_ROSTER = {
+  'أ.يزيد': { role: 'owner', branches: '', pin: '7284' },
+  'حسن': { role: 'owner', branches: '', pin: '5931' },
+  'الشيف عصام': { role: 'chef', branches: '', pin: '4062' },
+  'أبو يونس': { role: 'manager', branches: 'الروضة,الشاطئ', pin: '8317' },
+  'العامودي': { role: 'manager', branches: 'الشاطئ', pin: '2649' },
+  'عبدالهادي': { role: 'manager', branches: 'عبداللطيف جميل', pin: '6503' },
+  'غالب': { role: 'employee', branches: 'عبداللطيف جميل', pin: '9174' }
+};
 
 /**
  * شغّل هاي الدالة مرة وحدة بس (▶ Run فوق، اختارها من القائمة، وافق على الصلاحيات).
- * بتنشئ كل التبويبات المطلوبة تلقائياً بأسماء وأعمدة صحيحة، وبتعبي بيانات أولية
- * (30 صنف، 7 موظفين placeholder، إعدادات افتراضية) — ما بتحتاج تسوي شي يدوي بالشيت أبداً.
+ * بتنشئ كل التبويبات المطلوبة تلقائياً بأسماء وأعمدة صحيحة، وبتعبي بيانات أولية،
+ * وبتضيف أعمدة تسجيل الدخول (id/pin/role/branches) للموظفين الموجودين إذا كانوا ناقصين.
  * ممكن تشغّلها أكثر من مرة بأمان: ما بتكرر التبويبات ولا البيانات إذا كانت موجودة أصلاً.
  */
 function setupEverything() {
@@ -62,6 +81,7 @@ function setupEverything() {
   }
 
   seedInitialDataIfEmpty();
+  migrateEmployees_();
   ensureDefaultSetting('branches', DEFAULT_BRANCHES);
   ensureDefaultSetting('categoryOrder', DEFAULT_CATEGORY_ORDER);
   return 'تم إعداد كل التبويبات بنجاح';
@@ -72,6 +92,29 @@ function ensureDefaultSetting(key, defaultValue) {
   var r = readRows(SHEET_NAMES.SETTINGS);
   var exists = r.rows.some(function (row) { return row.key === key; });
   if (!exists) appendRow(SHEET_NAMES.SETTINGS, { key: key, value: defaultValue, updatedAt: nowIso() });
+}
+
+// يعبّي أعمدة تسجيل الدخول (id/pin/role/branches) للموظفين الموجودين بالشيت لو كانت فاضية —
+// ما بيلمس أي قيمة موجودة أصلاً، حتى لو تعدّلت يدوياً بالشيت. آمنة تشتغل أكثر من مرة.
+function migrateEmployees_() {
+  var r = readRows(SHEET_NAMES.EMPLOYEES);
+  var idCol = r.headers.indexOf('id') + 1;
+  var pinCol = r.headers.indexOf('pin') + 1;
+  var roleCol = r.headers.indexOf('role') + 1;
+  var branchesCol = r.headers.indexOf('branches') + 1;
+  var seq = 9001;
+  r.rows.forEach(function (row, i) {
+    var rowNum = i + 2;
+    var name = String(row.name || '').trim();
+    var roster = EMPLOYEE_ROSTER[name];
+    if (!row.id) r.sh.getRange(rowNum, idCol).setValue(Utilities.getUuid());
+    if (!row.role) r.sh.getRange(rowNum, roleCol).setValue(roster ? roster.role : 'employee');
+    if (!row.branches && roster) r.sh.getRange(rowNum, branchesCol).setValue(roster.branches);
+    if (!row.pin) {
+      var pin = roster ? roster.pin : String(seq++);
+      r.sh.getRange(rowNum, pinCol).setValue(hashPin_(pin));
+    }
+  });
 }
 
 function seedInitialDataIfEmpty() {
@@ -119,8 +162,13 @@ function seedInitialDataIfEmpty() {
 
   var employeesSheet = sheet(SHEET_NAMES.EMPLOYEES);
   if (employeesSheet.getLastRow() < 2) {
-    var employees = [1, 2, 3, 4, 5, 6, 7].map(function (n) { return ['موظف ' + n, true]; });
-    employeesSheet.getRange(2, 1, employees.length, 2).setValues(employees);
+    var names = Object.keys(EMPLOYEE_ROSTER);
+    var rows2 = names.map(function (name) {
+      var ro = EMPLOYEE_ROSTER[name];
+      // name, active, id, pin, role, branches
+      return [name, true, Utilities.getUuid(), hashPin_(ro.pin), ro.role, ro.branches];
+    });
+    employeesSheet.getRange(2, 1, rows2.length, 6).setValues(rows2);
   }
 
   var settingsSheet = sheet(SHEET_NAMES.SETTINGS);
@@ -143,15 +191,33 @@ function seedInitialDataIfEmpty() {
 function doGet(e) {
   try {
     var action = e.parameter.action;
+    if (action === 'login') throw new Error('سجّل الدخول عبر POST');
+    var employee = requireSession_(e.parameter.token);
     var data;
     switch (action) {
+      case 'me': data = employee; break;
       case 'getItems': data = getItems(e.parameter.all === '1'); break;
-      case 'getDay': data = getDay(e.parameter.date, e.parameter.branch); break;
-      case 'getReport': data = getReport(e.parameter.start, e.parameter.end); break;
-      case 'getTomorrowOrder': data = getTomorrowOrder(e.parameter.date, e.parameter.branch); break;
-      case 'getEmployees': data = getEmployees(); break;
+      case 'getDay':
+        requireBranchAccess_(employee, e.parameter.branch);
+        data = getDay(e.parameter.date, e.parameter.branch);
+        break;
+      case 'getReport':
+        if (employee.role === 'employee') throw new Error('غير مصرح');
+        data = getReport(e.parameter.start, e.parameter.end, employee.role === 'manager' ? employee.branches : null);
+        break;
+      case 'getTomorrowOrder':
+        requireBranchAccess_(employee, e.parameter.branch);
+        data = getTomorrowOrder(e.parameter.date, e.parameter.branch);
+        break;
+      case 'getEmployees':
+        if (employee.role !== 'owner') throw new Error('غير مصرح');
+        data = getEmployees();
+        break;
       case 'getSettings': data = getSettings(); break;
-      case 'backupAll': data = backupAll(); break;
+      case 'backupAll':
+        if (employee.role !== 'owner') throw new Error('غير مصرح');
+        data = backupAll();
+        break;
       default: throw new Error('unknown action: ' + action);
     }
     return jsonOut({ ok: true, data: data });
@@ -164,15 +230,40 @@ function doPost(e) {
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(10000);
-    var body = JSON.parse(e.postData.contents); // {action, payload}
+    var body = JSON.parse(e.postData.contents); // {action, payload, token}
+
+    if (body.action === 'login') return jsonOut({ ok: true, data: login(body.payload && body.payload.pin) });
+    if (body.action === 'logout') return jsonOut({ ok: true, data: logout(body.token) });
+
+    var employee = requireSession_(body.token);
     var data;
     switch (body.action) {
-      case 'saveItem': data = saveItem(body.payload); break;
-      case 'deleteItem': data = deleteItem(body.payload); break;
-      case 'saveDay': data = saveDay(body.payload); break;
-      case 'saveTomorrowOrder': data = saveTomorrowOrder(body.payload); break;
-      case 'saveSettings': data = saveSettings(body.payload); break;
-      case 'restoreAll': data = restoreAll(body.payload); break;
+      case 'saveItem':
+        requireItemWriteAccess_(employee, body.payload);
+        data = saveItem(body.payload);
+        break;
+      case 'deleteItem':
+        requireItemDeleteAccess_(employee, body.payload);
+        data = deleteItem(body.payload);
+        break;
+      case 'saveDay':
+        if (employee.role === 'chef') throw new Error('غير مصرح — الشيف يشوف بس');
+        requireBranchAccess_(employee, body.payload.branch);
+        data = saveDay(body.payload);
+        break;
+      case 'saveTomorrowOrder':
+        if (employee.role === 'chef') throw new Error('غير مصرح — الشيف يشوف بس');
+        requireBranchAccess_(employee, body.payload.branch);
+        data = saveTomorrowOrder(body.payload);
+        break;
+      case 'saveSettings':
+        if (employee.role !== 'owner') throw new Error('غير مصرح');
+        data = saveSettings(body.payload);
+        break;
+      case 'restoreAll':
+        if (employee.role !== 'owner') throw new Error('غير مصرح');
+        data = restoreAll(body.payload);
+        break;
       default: throw new Error('unknown action: ' + body.action);
     }
     return jsonOut({ ok: true, data: data });
@@ -186,6 +277,93 @@ function doPost(e) {
 function jsonOut(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ==================== المصادقة والصلاحيات ====================
+
+var PIN_SALT = 'prohouse-2026-salt'; // ثابت — تغييره بيبطل كل الأرقام السرية الحالية، ما تغيّره بدون داعي
+
+function hashPin_(pin) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, PIN_SALT + String(pin));
+  return bytes.map(function (b) {
+    var v = b < 0 ? b + 256 : b;
+    return ('0' + v.toString(16)).slice(-2);
+  }).join('');
+}
+
+function login(pin) {
+  if (!pin) throw new Error('أدخل الرقم السري');
+  var hash = hashPin_(pin);
+  var rows = readRows(SHEET_NAMES.EMPLOYEES).rows;
+  var row = rows.filter(function (x) { return x.pin === hash && (x.active === true || x.active === 'TRUE'); })[0];
+  if (!row) throw new Error('رقم سري غير صحيح');
+
+  cleanupExpiredSessions_();
+
+  var token = Utilities.getUuid() + Utilities.getUuid();
+  var now = nowIso();
+  var expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  appendRow(SHEET_NAMES.SESSIONS, { token: token, employeeId: row.id, createdAt: now, expiresAt: expiresAt });
+
+  return {
+    token: token,
+    employee: {
+      id: row.id, name: row.name, role: row.role,
+      branches: (row.branches || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean)
+    }
+  };
+}
+
+function logout(token) {
+  if (token) deleteRowsWhere(SHEET_NAMES.SESSIONS, function (row) { return row.token === token; });
+  return { ok: true };
+}
+
+function cleanupExpiredSessions_() {
+  var nowMs = Date.now();
+  deleteRowsWhere(SHEET_NAMES.SESSIONS, function (row) {
+    var t = new Date(row.expiresAt).getTime();
+    return isNaN(t) || t < nowMs;
+  });
+}
+
+function requireSession_(token) {
+  if (!token) throw new Error('لازم تسجل دخول');
+  var session = readRows(SHEET_NAMES.SESSIONS).rows.filter(function (s) { return s.token === token; })[0];
+  if (!session) throw new Error('الجلسة غير صالحة، سجّل دخول من جديد');
+  if (new Date(session.expiresAt).getTime() < Date.now()) throw new Error('انتهت الجلسة، سجّل دخول من جديد');
+  var emp = readRows(SHEET_NAMES.EMPLOYEES).rows.filter(function (x) { return x.id === session.employeeId; })[0];
+  if (!emp || !(emp.active === true || emp.active === 'TRUE')) throw new Error('الحساب غير مفعّل');
+  return {
+    id: emp.id, name: emp.name, role: emp.role,
+    branches: (emp.branches || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean)
+  };
+}
+
+function hasBranchAccess_(emp, branch) {
+  if (emp.role === 'owner' || emp.role === 'chef') return true;
+  return emp.branches.indexOf(branch) !== -1;
+}
+function requireBranchAccess_(emp, branch) {
+  if (!hasBranchAccess_(emp, branch)) throw new Error('غير مصرح لهذا الفرع');
+}
+
+// موظف/مدير بيقدروا يضيفوا أو يعدّلوا بس أصناف موسومة بفرعهم (branches = فرع واحد محدد)،
+// ما بيقدروا يلمسوا الأصناف المشتركة (branches فاضي = كل الفروع) ولا أصناف فروع تانية.
+function requireItemWriteAccess_(emp, payload) {
+  if (emp.role === 'owner') return;
+  if (emp.role === 'chef') throw new Error('غير مصرح');
+  var b = String(payload.branches || '').trim();
+  if (!b || emp.branches.indexOf(b) === -1) throw new Error('لازم تحدد فرعك بالصنف — غير مصرح بتعديل أصناف مشتركة أو فروع تانية');
+}
+
+function requireItemDeleteAccess_(emp, payload) {
+  if (emp.role === 'owner') return;
+  if (emp.role === 'chef') throw new Error('غير مصرح');
+  var item = readRows(SHEET_NAMES.ITEMS).rows.filter(function (it) { return it.id === payload.id; })[0];
+  if (!item) throw new Error('الصنف غير موجود');
+  var b = String(item.branches || '').trim();
+  if (!b || emp.branches.indexOf(b) === -1) throw new Error('غير مصرح بحذف هذا الصنف');
 }
 
 // ==================== helpers ====================
@@ -354,12 +532,17 @@ function saveDay(p) {
   return { date: p.date, branch: p.branch, savedAt: savedAt };
 }
 
-function getReport(start, end) {
+function getReport(start, end, branchFilter) {
   var settings = getSettings();
   var returnThreshold = settings.returnThresholdPct !== undefined && settings.returnThresholdPct !== ''
     ? Number(settings.returnThresholdPct) : 0.30;
   var allEntries = readRows(SHEET_NAMES.DAILY).rows.filter(function (r) { return r.date >= start && r.date <= end; });
   var allMeta = readRows(SHEET_NAMES.DAYMETA).rows.filter(function (r) { return r.date >= start && r.date <= end; });
+
+  if (branchFilter && branchFilter.length) {
+    allEntries = allEntries.filter(function (r) { return branchFilter.indexOf(r.branch) !== -1; });
+    allMeta = allMeta.filter(function (r) { return branchFilter.indexOf(r.branch) !== -1; });
+  }
 
   // نجمع حسب (التاريخ + الفرع) — كل فرع بيوم معين سجل مستقل بروابطه وموظفه الخاص،
   // بينما الإجمالي (totals تحت) بيضم كل الفروع مع بعض بتقرير واحد للشيف.

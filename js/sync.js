@@ -40,13 +40,16 @@ const Sync = (() => {
     if (!API_URL) return cached ? cached.value : null;
 
     try {
-      const qs = new URLSearchParams({ action, ...(params || {}) }).toString();
+      const qs = new URLSearchParams({ action, token: Auth.getToken(), ...(params || {}) }).toString();
       const controller = new AbortController();
       const t = setTimeout(() => controller.abort(), 15000);
       const res = await fetch(API_URL + "?" + qs, { signal: controller.signal });
       clearTimeout(t);
       const json = await res.json();
-      if (!json.ok) throw new Error(json.error || "server error");
+      if (!json.ok) {
+        if (isAuthError(json.error)) forceReLogin();
+        throw new Error(json.error || "server error");
+      }
       cacheSet(ck, json.data);
       onFresh && onFresh(json.data, false);
       return json.data;
@@ -75,11 +78,24 @@ const Sync = (() => {
     const res = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" }, // يتفادى CORS preflight مع Apps Script
-      body: JSON.stringify({ action, payload })
+      body: JSON.stringify({ action, payload, token: Auth.getToken() })
     });
     const json = await res.json();
-    if (!json.ok) throw new Error(json.error || "server error");
+    if (!json.ok) {
+      if (isAuthError(json.error)) forceReLogin();
+      throw new Error(json.error || "server error");
+    }
     return json.data;
+  }
+
+  // أخطاء الجلسة/الصلاحيات ما لازم تدخل بطابور إعادة المحاولة (رح تفشل كل مرة بنفس السبب) —
+  // بدل هيك، نوقف المزامنة ونطلب تسجيل دخول جديد.
+  function isAuthError(msg) {
+    const m = String(msg || "");
+    return m.includes("تسجل دخول") || m.includes("الجلسة") || m.includes("الحساب غير مفعّل");
+  }
+  function forceReLogin() {
+    if (typeof Auth !== "undefined") Auth.clearSessionAndReload && Auth.clearSessionAndReload();
   }
 
   let flushing = false;
@@ -115,9 +131,3 @@ const Sync = (() => {
 
   return { get, enqueue, flushQueue, getQueue, cacheGet, cacheSet, onStatusChange, emitStatus };
 })();
-
-// ==================== هوية الموظف الحالي ====================
-const Employee = {
-  get() { return localStorage.getItem("ph_employee") || ""; },
-  set(name) { localStorage.setItem("ph_employee", name); }
-};

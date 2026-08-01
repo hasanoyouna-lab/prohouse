@@ -1,6 +1,22 @@
-// ==================== التنقل بين التابات + الإقلاع ====================
+// ==================== التنقل بين التابات + الإقلاع + تسجيل الدخول ====================
+
+const TAB_ROLE_ACCESS = {
+  dashboard: ["owner", "manager", "chef", "employee"],
+  entry: ["owner", "manager", "chef", "employee"],
+  tomorrow: ["owner", "manager", "chef", "employee"],
+  report: ["owner", "manager", "chef"],
+  items: ["owner", "manager", "employee"],
+  settings: ["owner"]
+};
+
+function tabAllowed(tab) {
+  const role = Auth.role();
+  return !!(role && TAB_ROLE_ACCESS[tab] && TAB_ROLE_ACCESS[tab].includes(role));
+}
 
 function setActiveTab(tab) {
+  if (!tabAllowed(tab)) tab = "dashboard";
+
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
 
   document.getElementById("dashboardView").classList.toggle("hidden", tab !== "dashboard");
@@ -13,8 +29,8 @@ function setActiveTab(tab) {
   document.getElementById("entryDateBar").classList.toggle("hidden", tab !== "entry");
   document.getElementById("tomorrowDateBar").classList.toggle("hidden", tab !== "tomorrow");
 
-  document.getElementById("saveBarEntry").classList.toggle("hidden", tab !== "entry");
-  document.getElementById("saveBarTomorrow").classList.toggle("hidden", tab !== "tomorrow");
+  document.getElementById("saveBarEntry").classList.toggle("hidden", tab !== "entry" || Auth.isViewOnlyEntry());
+  document.getElementById("saveBarTomorrow").classList.toggle("hidden", tab !== "tomorrow" || Auth.isViewOnlyTomorrow());
 
   if (tab === "dashboard") { renderDashboard(); }
   if (tab === "items") { Items.load().then(renderItemsAdminView); }
@@ -24,6 +40,18 @@ function setActiveTab(tab) {
 document.querySelectorAll(".tab-btn").forEach(btn => {
   btn.addEventListener("click", () => setActiveTab(btn.dataset.tab));
 });
+
+// يخفي التابات الممنوعة حسب دور المستخدم المسجّل دخول
+function applyRoleUiGating() {
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.classList.toggle("hidden", !tabAllowed(btn.dataset.tab));
+  });
+  const emp = Auth.getEmployee();
+  const roleLabel = { owner: "مالك", manager: "مدير فرع", chef: "شيف", employee: "موظف" };
+  document.getElementById("userBarName").textContent = emp ? emp.name : "";
+  document.getElementById("userBarRole").textContent = emp ? (roleLabel[emp.role] || emp.role) : "";
+  document.getElementById("userBar").classList.remove("hidden");
+}
 
 // ---- شارة حالة المزامنة ----
 function updateSyncBadge({ pending }) {
@@ -58,12 +86,61 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
   navigator.serviceWorker.register("sw.js").catch((e) => console.warn("SW register failed:", e));
 }
 
+// ---- تسجيل الدخول ----
+function showLoginView() {
+  document.getElementById("loginView").classList.remove("hidden");
+  document.querySelector("header").classList.add("hidden");
+  document.querySelector("main").classList.add("hidden");
+}
+function hideLoginView() {
+  document.getElementById("loginView").classList.add("hidden");
+  document.querySelector("header").classList.remove("hidden");
+  document.querySelector("main").classList.remove("hidden");
+}
+
+function startApp() {
+  hideLoginView();
+  applyRoleUiGating();
+  updateOfflineBanner();
+  updateSyncBadge({ pending: Sync.getQueue().length });
+  loadSettings();
+  initDashboardTab();
+  initEntryTab();
+  initTomorrowTab();
+  initReportTab();
+  setActiveTab("dashboard");
+}
+
+async function doLoginSubmit() {
+  const pin = document.getElementById("loginPinInput").value.trim();
+  const errEl = document.getElementById("loginError");
+  errEl.classList.add("hidden");
+  if (!pin) return;
+  const btn = document.getElementById("loginSubmitBtn");
+  btn.disabled = true;
+  try {
+    await Auth.login(pin);
+    startApp();
+  } catch (e) {
+    errEl.textContent = String(e).replace(/^(Error:\s*)+/, "");
+    errEl.classList.remove("hidden");
+  } finally {
+    btn.disabled = false;
+  }
+}
+document.getElementById("loginSubmitBtn").addEventListener("click", doLoginSubmit);
+document.getElementById("loginPinInput").addEventListener("keydown", (e) => { if (e.key === "Enter") doLoginSubmit(); });
+
+document.getElementById("logoutBtn").addEventListener("click", async () => {
+  if (!confirm("تسجيل الخروج؟")) return;
+  await Auth.logout();
+  location.reload();
+});
+
 // ---- الإقلاع ----
-updateOfflineBanner();
-updateSyncBadge({ pending: Sync.getQueue().length });
-loadSettings();
-Sync.get("getEmployees", {}, "employees");
-initDashboardTab();
-initEntryTab();
-initTomorrowTab();
-initReportTab();
+(async function boot() {
+  if (!Auth.isLoggedIn()) { showLoginView(); return; }
+  await Auth.verify(); // يحدّث الدور/الفروع لو تغيّرت، وبيرجع لتسجيل الدخول لو الجلسة انتهت
+  if (!Auth.isLoggedIn()) { showLoginView(); return; }
+  startApp();
+})();

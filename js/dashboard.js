@@ -36,16 +36,19 @@ async function renderDashboard() {
   view.innerHTML = '<div class="loader">جاري تحميل الرئيسية…</div>';
 
   await Items.load();
-  const branches = branchList();
+  const branches = allowedBranchList();
   const statuses = await Promise.all(branches.map(loadBranchStatus));
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "صباح الخير" : hour < 17 ? "مساء الخير" : "مساء الخير";
 
-  const monthStart = todayStr().slice(0, 7) + "-01";
-  const monthEnd = todayStr();
-  const reportData = await Sync.get("getReport", { start: monthStart, end: monthEnd }, "report:" + monthStart + ":" + monthEnd);
-  const flaggedCount = (reportData && reportData.flaggedCount) || 0;
+  let flaggedCount = 0;
+  if (Auth.canSeeReports()) {
+    const monthStart = todayStr().slice(0, 7) + "-01";
+    const monthEnd = todayStr();
+    const reportData = await Sync.get("getReport", { start: monthStart, end: monthEnd }, "report:" + monthStart + ":" + monthEnd);
+    flaggedCount = (reportData && reportData.flaggedCount) || 0;
+  }
 
   const pending = Sync.getQueue().length;
 
@@ -55,15 +58,16 @@ async function renderDashboard() {
 
     <div class="dash-grid" id="dashBranchGrid"></div>
 
+    ${Auth.canSeeReports() ? `
     <div class="dash-tile" id="dashFlaggedTile">
       <div class="lbl">عدد الأصناف بنسبة إرجاع مرتفعة هذا الشهر (هدر محتمل)</div>
       <div class="big">${flaggedCount}</div>
-    </div>
+    </div>` : ""}
 
     <div class="dash-links">
       <button class="btn primary" id="dashGotoEntry">📝 طلبية اليوم</button>
       <button class="btn" id="dashGotoTomorrow">📦 طلبية الغد</button>
-      <button class="btn" id="dashGotoReport">📊 التقارير</button>
+      ${Auth.canSeeReports() ? '<button class="btn" id="dashGotoReport">📊 التقارير</button>' : ""}
     </div>
   `;
 
@@ -85,12 +89,14 @@ async function renderDashboard() {
     grid.appendChild(card);
   });
 
-  document.getElementById("dashFlaggedTile").addEventListener("click", () => {
-    document.querySelector('.tab-btn[data-tab="report"]').click();
-  });
+  if (Auth.canSeeReports()) {
+    document.getElementById("dashFlaggedTile").addEventListener("click", () => {
+      document.querySelector('.tab-btn[data-tab="report"]').click();
+    });
+    document.getElementById("dashGotoReport").addEventListener("click", () => document.querySelector('.tab-btn[data-tab="report"]').click());
+  }
   document.getElementById("dashGotoEntry").addEventListener("click", () => document.querySelector('.tab-btn[data-tab="entry"]').click());
   document.getElementById("dashGotoTomorrow").addEventListener("click", () => document.querySelector('.tab-btn[data-tab="tomorrow"]').click());
-  document.getElementById("dashGotoReport").addEventListener("click", () => document.querySelector('.tab-btn[data-tab="report"]').click());
 }
 
 function initDashboardTab() {

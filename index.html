@@ -12,6 +12,17 @@
 </head>
 <body>
 
+<div id="loginView" class="login-view hidden">
+  <div class="login-card">
+    <img class="login-logo" src="assets/logo.png" alt="Pro House">
+    <h1>Pro House</h1>
+    <div class="login-sub">أدخل رقمك السري لتسجيل الدخول</div>
+    <input type="tel" inputmode="numeric" pattern="[0-9]*" id="loginPinInput" class="login-pin-input" placeholder="••••" maxlength="8" autocomplete="off">
+    <button class="btn gold login-btn" id="loginSubmitBtn">دخول</button>
+    <div class="login-error hidden" id="loginError"></div>
+  </div>
+</div>
+
 <header>
   <div class="header-top">
     <img id="headerLogoImg" class="logo" src="assets/logo.png" alt="Pro House">
@@ -21,6 +32,12 @@
       <div class="sub">إدارة طلبيات برو هاوس</div>
     </div>
     <button class="sync-badge" id="syncBadge" title="حالة المزامنة">🔄 متصل</button>
+  </div>
+
+  <div class="user-bar hidden" id="userBar">
+    <span id="userBarName"></span>
+    <span class="badge neutral" id="userBarRole"></span>
+    <button class="logout-btn" id="logoutBtn">خروج</button>
   </div>
 
   <div class="tabs">
@@ -115,6 +132,7 @@
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="js/config.js"></script>
+<script src="js/auth.js"></script>
 <script src="js/sync.js"></script>
 <script src="js/entry.js"></script>
 <script src="js/items.js"></script>

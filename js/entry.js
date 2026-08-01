@@ -4,6 +4,16 @@ const SHORTAGE_THRESHOLD_DEFAULT = -0.20;
 const SURPLUS_THRESHOLD_DEFAULT  = 0.25;
 const RETURN_THRESHOLD_DEFAULT   = 0.30;
 
+// الوجبة عند برو هاوس ~150 جرام — نحسب عدد الوجبات للأصناف اللي بتتوزن (دجاج/لحم/بحري) فقط
+const MEAL_WEIGHT_G = 150;
+const MEAL_CATEGORIES = ["دجاج", "لحم", "بحري"];
+function isMealCategory(cat) { return MEAL_CATEGORIES.includes(cat); }
+function mealsCount(grams) {
+  const n = Number(grams);
+  if (grams === "" || grams === null || grams === undefined || isNaN(n)) return "";
+  return (n / MEAL_WEIGHT_G).toFixed(1);
+}
+
 // تُقرأ من شاشة الإعدادات (currentSettings مُعرّفة بـ js/settings.js) إن كانت محفوظة، وإلا القيم الافتراضية فوق.
 function thresholdFrom(key, fallback) {
   const v = (typeof currentSettings !== "undefined" && currentSettings[key] !== undefined && currentSettings[key] !== "")
@@ -38,9 +48,17 @@ function branchList() {
   return raw.split(",").map(s => s.trim()).filter(Boolean);
 }
 
+// الفروع المسموحة للمستخدم المسجّل دخول (مالك/شيف بيشوفوا الكل، الباقي بس فروعهم)
+function allowedBranchList() {
+  const all = branchList();
+  if (Auth.canSeeAllBranches()) return all;
+  const mine = Auth.branches();
+  return all.filter(b => mine.includes(b));
+}
+
 function branchOptionsHtml(selected) {
   const current = selected || Branch.get();
-  return `<option value="">اختر الفرع</option>` + branchList().map(b =>
+  return `<option value="">اختر الفرع</option>` + allowedBranchList().map(b =>
     `<option value="${b}" ${b === current ? "selected" : ""}>${b}</option>`
   ).join("");
 }
@@ -113,27 +131,34 @@ function renderEntryView() {
   if (!view) return;
   view.innerHTML = "";
 
+  const myBranches = allowedBranchList();
+  const branchLocked = myBranches.length <= 1;
+
   const metaCard = document.createElement("div");
   metaCard.className = "item-card";
   metaCard.innerHTML = `
     <div class="inputs-row">
       <div class="field">
         <label>الموظف</label>
-        <select id="employeeSelect">${employeeOptionsHtml()}</select>
+        <div class="readonly-field">${Auth.getEmployee() ? Auth.getEmployee().name : ""}</div>
       </div>
       <div class="field">
         <label>الفرع</label>
-        <select id="branchSelect">${branchOptionsHtml(currentBranch)}</select>
+        ${branchLocked
+          ? `<div class="readonly-field">${myBranches[0] || "لا يوجد فرع مرتبط بحسابك"}</div>`
+          : `<select id="branchSelect">${branchOptionsHtml(currentBranch)}</select>`}
       </div>
     </div>
+    ${Auth.isViewOnlyEntry() ? '<div class="badges"><span class="badge neutral">👁 عرض فقط — الشيف ما بيعدّل هون</span></div>' : ""}
   `;
   view.appendChild(metaCard);
-  document.getElementById("employeeSelect").addEventListener("change", scheduleAutoSave);
-  document.getElementById("branchSelect").addEventListener("change", (e) => {
-    currentBranch = e.target.value;
-    Branch.set(currentBranch);
-    loadEntryDay(currentEntryDate);
-  });
+  if (!branchLocked) {
+    document.getElementById("branchSelect").addEventListener("change", (e) => {
+      currentBranch = e.target.value;
+      Branch.set(currentBranch);
+      loadEntryDay(currentEntryDate);
+    });
+  }
 
   // فلترة الأصناف حسب الفرع — فقط بشاشة الاستلام (طلبية الغد بتضل تعرض كل الأصناف)
   const visibleItems = Items.current.filter(item => {
@@ -151,6 +176,8 @@ function renderEntryView() {
   progressWrap.className = "progress-bar-wrap";
   progressWrap.id = "entryProgressWrap";
   view.appendChild(progressWrap);
+
+  const ro = Auth.isViewOnlyEntry() ? "disabled" : "";
 
   // تجميع الأصناف حسب الفئة بنفس ترتيبها القادم من السيرفر
   const groups = [];
@@ -196,13 +223,13 @@ function renderEntryView() {
         <div class="item-name" style="display:flex;align-items:center;justify-content:space-between;">
           <span>${item.name} <span class="item-unit">(${item.unit})</span></span>
           <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;cursor:pointer;">
-            <input type="checkbox" data-id="${item.id}" data-field="confirmed" ${entry.confirmed ? "checked" : ""} style="width:20px;height:20px;">
+            <input type="checkbox" data-id="${item.id}" data-field="confirmed" ${entry.confirmed ? "checked" : ""} style="width:20px;height:20px;" ${ro}>
             تم الاستلام
           </label>
         </div>
         ${item.hasCustomName ? `
           <div class="cookname-row">
-            <input type="text" placeholder="اسم الطبخة (مطلوب)" data-id="${item.id}" data-field="cookName" value="${entry.cookName || ""}">
+            <input type="text" placeholder="اسم الطبخة (مطلوب)" data-id="${item.id}" data-field="cookName" value="${entry.cookName || ""}" ${ro}>
           </div>` : ""}
         ${requestedQty[item.id] !== undefined && requestedQty[item.id] !== "" ? `
           <div class="badges" style="margin-top:0;">
@@ -211,15 +238,19 @@ function renderEntryView() {
         <div class="inputs-row">
           <div class="field">
             <label>الكمية المستلمة (جم)</label>
-            <input type="number" inputmode="decimal" data-id="${item.id}" data-field="received" value="${entry.received}">
+            <input type="number" inputmode="decimal" data-id="${item.id}" data-field="received" value="${entry.received}" ${ro}>
           </div>
           <div class="field">
             <label>الكمية المرتجعة (جم)</label>
-            <input type="number" inputmode="decimal" data-id="${item.id}" data-field="returned" value="${entry.returned}">
+            <input type="number" inputmode="decimal" data-id="${item.id}" data-field="returned" value="${entry.returned}" ${ro}>
           </div>
         </div>
+        ${isMealCategory(item.category) ? `
+          <div class="badges" style="margin-top:0;">
+            <span class="badge neutral" id="meals-${item.id}">🍽 عدد الوجبات: ${mealsCount(entry.received) || "—"}</span>
+          </div>` : ""}
         <div class="notes-row">
-          <input type="text" placeholder="ملاحظة (اختياري)" data-id="${item.id}" data-field="notes" value="${entry.notes || ""}">
+          <input type="text" placeholder="ملاحظة (اختياري)" data-id="${item.id}" data-field="notes" value="${entry.notes || ""}" ${ro}>
         </div>
         <div class="badges" id="badges-${item.id}"></div>
       `;
@@ -230,18 +261,48 @@ function renderEntryView() {
     view.appendChild(section);
   });
 
+  if (Auth.canManageItems() && currentBranch) {
+    const quickAdd = document.createElement("div");
+    quickAdd.className = "item-card";
+    quickAdd.id = "quickAddCard";
+    const cats = [...new Set(Items.current.map(it => it.category).filter(Boolean))].sort((a, b) => categoryRank(a) - categoryRank(b));
+    quickAdd.innerHTML = `
+      <button type="button" class="btn" id="quickAddToggle">+ إضافة صنف استلمته خارج القائمة</button>
+      <div id="quickAddForm" class="hidden" style="margin-top:10px;">
+        <div class="field" id="quickAddCatGroup"><label>التصنيف</label>${categorySelectHtml(cats, "")}</div>
+        <div class="field"><label>اسم الصنف</label><input type="text" id="quickAddName"></div>
+        <div class="field"><label>الوحدة</label><input type="text" id="quickAddUnit" placeholder="مثال: كغم"></div>
+        <button class="btn gold" id="quickAddSaveBtn">إضافة للقائمة</button>
+      </div>
+    `;
+    view.appendChild(quickAdd);
+    wireCategoryGroup(document.getElementById("quickAddCatGroup"));
+    document.getElementById("quickAddToggle").addEventListener("click", () => {
+      document.getElementById("quickAddForm").classList.toggle("hidden");
+    });
+    document.getElementById("quickAddSaveBtn").addEventListener("click", () => {
+      const category = categoryValue(document.getElementById("quickAddCatGroup"));
+      const name = document.getElementById("quickAddName").value.trim();
+      const unit = document.getElementById("quickAddUnit").value.trim();
+      if (!category || !name) { showToast("لازم تعبي التصنيف واسم الصنف"); return; }
+      Items.save({ category, name, unit, hasCustomName: false, branches: currentBranch, sortOrder: Items.current.length + 1 });
+      showToast("انضاف الصنف للقائمة");
+      renderEntryView();
+    });
+  }
+
   const linksCard = document.createElement("div");
   linksCard.className = "item-card";
   linksCard.innerHTML = `
     <div class="notes-row">
-      <input type="url" id="salesLink" placeholder="رابط تقرير المبيعات حسب المنتج (Foodics/Tabsense)" value="${currentDayMeta.salesReportLink || ""}">
+      <input type="url" id="salesLink" placeholder="رابط تقرير المبيعات حسب المنتج (Foodics/Tabsense)" value="${currentDayMeta.salesReportLink || ""}" ${ro}>
     </div>
     <div class="notes-row">
-      <input type="url" id="paymentsLink" placeholder="رابط تقرير المدفوعات" value="${currentDayMeta.paymentsReportLink || ""}">
+      <input type="url" id="paymentsLink" placeholder="رابط تقرير المدفوعات" value="${currentDayMeta.paymentsReportLink || ""}" ${ro}>
     </div>
   `;
   view.appendChild(linksCard);
-  document.getElementById("salesLink").addEventListener("input", scheduleAutoSave);
+  if (!Auth.isViewOnlyEntry()) document.getElementById("salesLink").addEventListener("input", scheduleAutoSave);
   document.getElementById("paymentsLink").addEventListener("input", scheduleAutoSave);
 
   view.querySelectorAll("input[data-field]").forEach(inp => {
@@ -278,21 +339,17 @@ function updateProgressBar(visibleItems) {
   `;
 }
 
-function employeeOptionsHtml() {
-  const list = Sync.cacheGet("employees");
-  const employees = (list && list.value) || [{ name: "موظف 1" }, { name: "موظف 2" }, { name: "موظف 3" }, { name: "موظف 4" }, { name: "موظف 5" }, { name: "موظف 6" }, { name: "موظف 7" }];
-  const current = currentDayMeta.employeeName || Employee.get();
-  return `<option value="">اختر الموظف</option>` + employees.map(e =>
-    `<option value="${e.name}" ${e.name === current ? "selected" : ""}>${e.name}</option>`
-  ).join("");
-}
-
 function onFieldChange(e) {
   const id = e.target.dataset.id;
   const field = e.target.dataset.field;
   if (!currentEntry[id]) currentEntry[id] = { received: "", returned: "", notes: "", cookName: "", confirmed: false };
   currentEntry[id][field] = e.target.type === "checkbox" ? e.target.checked : e.target.value;
   updateBadges(id);
+
+  if (field === "received") {
+    const mealsEl = document.getElementById("meals-" + id);
+    if (mealsEl) mealsEl.textContent = "🍽 عدد الوجبات: " + (mealsCount(currentEntry[id].received) || "—");
+  }
 
   const card = document.getElementById("card-" + id);
   if (card) card.classList.toggle("warn-empty", isItemWarnEmpty(id));
@@ -322,12 +379,17 @@ function updateBadges(id) {
 
 async function loadEntryDay(dateStr) {
   currentBranch = Branch.get();
+  const myBranches = allowedBranchList();
+  // مو مالك/شيف وعنده فرع واحد بس — نحدده تلقائياً، ما في داعي يختار
+  if (myBranches.length === 1 && currentBranch !== myBranches[0]) currentBranch = myBranches[0];
+  if (currentBranch && !Auth.canSeeAllBranches() && !myBranches.includes(currentBranch)) currentBranch = myBranches[0] || "";
+  Branch.set(currentBranch);
   await Items.load();
 
   if (!currentBranch) {
     // ما فيه فرع محدد بعد — نطلب اختياره قبل ما نجيب/نعرض بيانات أي فرع
     currentEntry = {};
-    currentDayMeta = { employeeName: Employee.get(), salesReportLink: "", paymentsReportLink: "" };
+    currentDayMeta = { employeeName: (Auth.getEmployee() || {}).name || "", salesReportLink: "", paymentsReportLink: "" };
     renderEntryView();
     document.getElementById("saveStatus").textContent = "اختر الفرع أولاً";
     return;
@@ -335,7 +397,7 @@ async function loadEntryDay(dateStr) {
 
   document.getElementById("entryView").innerHTML = '<div class="loader">جاري التحميل…</div>';
   currentEntry = {};
-  currentDayMeta = { employeeName: Employee.get(), salesReportLink: "", paymentsReportLink: "" };
+  currentDayMeta = { employeeName: (Auth.getEmployee() || {}).name || "", salesReportLink: "", paymentsReportLink: "" };
 
   const cacheKey = "day:" + dateStr + ":" + currentBranch;
   const dayData = await Sync.get("getDay", { date: dateStr, branch: currentBranch }, cacheKey, (val) => applyDayData(val));
@@ -363,10 +425,11 @@ function applyDayData(val) {
 
 // حفظ فوري (بدون انتظار ضغطة زر) — كل قيمة (استلام صباحاً، إرجاع بعد الظهر، أي حقل) تنحفظ لحالها أول ما تتغير
 function saveEntryNow(showStatus) {
-  // نحفظ دايماً حتى لو الفرع أو الموظف لسا ما انحددوا (بيانات ناقصة أحسن من ولا بيانات) —
-  // بس بنحط تنبيه بسيط يفكّر المستخدم يكملهم، بدون ما يمنع الحفظ.
-  const employeeName = document.getElementById("employeeSelect").value;
-  if (employeeName) Employee.set(employeeName);
+  if (Auth.isViewOnlyEntry()) return; // الشيف عرض بس، ما بيحفظ
+
+  // نحفظ دايماً حتى لو الفرع لسا ما انحدد (بيانات ناقصة أحسن من ولا بيانات) —
+  // بس بنحط تنبيه بسيط يفكّر المستخدم يكمّله، بدون ما يمنع الحفظ.
+  const employeeName = (Auth.getEmployee() || {}).name || "";
   const branch = currentBranch || "";
 
   const salesReportLink = document.getElementById("salesLink").value.trim();
@@ -387,7 +450,6 @@ function saveEntryNow(showStatus) {
 
   const missing = [];
   if (!branch) missing.push("الفرع");
-  if (!employeeName) missing.push("الموظف");
   const savedAtText = new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
   document.getElementById("saveStatus").textContent = missing.length
     ? `✅ محفوظ (بدون ${missing.join(" و")} — كمّلهم أول ما تقدر) — ${savedAtText}`
