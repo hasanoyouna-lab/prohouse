@@ -31,32 +31,42 @@ const Sync = (() => {
     localStorage.setItem("ph_cache:" + key, JSON.stringify({ value, fetchedAt: Date.now() }));
   }
 
-  // ---- طلبات القراءة (GET) — cache-then-network ----
+  // ---- طلبات القراءة (GET) — cache-first-unblocked ----
   async function get(action, params, cacheKey, onFresh) {
     const ck = cacheKey || action;
     const cached = cacheGet(ck);
-    if (cached) onFresh && onFresh(cached.value, true);
 
-    if (!API_URL) return cached ? cached.value : null;
-
-    try {
-      const qs = new URLSearchParams({ action, token: Auth.getToken(), ...(params || {}) }).toString();
-      const controller = new AbortController();
-      const t = setTimeout(() => controller.abort(), 15000);
-      const res = await fetch(API_URL + "?" + qs, { signal: controller.signal });
-      clearTimeout(t);
-      const json = await res.json();
-      if (!json.ok) {
-        if (isAuthError(json.error)) forceReLogin();
-        throw new Error(json.error || "server error");
+    // نطلق طلب التحديث بالخلفية بدون تعطيل واجهة المستخدم
+    const fetchPromise = (async () => {
+      if (!API_URL) return null;
+      try {
+        const qs = new URLSearchParams({ action, token: Auth.getToken(), ...(params || {}) }).toString();
+        const controller = new AbortController();
+        const t = setTimeout(() => controller.abort(), 10000);
+        const res = await fetch(API_URL + "?" + qs, { signal: controller.signal });
+        clearTimeout(t);
+        const json = await res.json();
+        if (!json.ok) {
+          if (isAuthError(json.error)) forceReLogin();
+          throw new Error(json.error || "server error");
+        }
+        cacheSet(ck, json.data);
+        if (onFresh) onFresh(json.data);
+        return json.data;
+      } catch (e) {
+        console.warn("Sync.get background fetch failed:", action, e);
+        return null;
       }
-      cacheSet(ck, json.data);
-      onFresh && onFresh(json.data, false);
-      return json.data;
-    } catch (e) {
-      console.warn("Sync.get failed, falling back to cache:", action, e);
-      return cached ? cached.value : null;
+    })();
+
+    // إذا كان البيانات موجودة بالكاش المحلّي، بنرجّعها فوراً للواجهة (0 ملي ثانية) والـ Network بيمشي بالخلفية
+    if (cached && cached.value !== null && cached.value !== undefined) {
+      return cached.value;
     }
+
+    // إذا ما كانت بالكاش أبداً، ننتظر طلب الشبكة الأوّل
+    const fresh = await fetchPromise;
+    return fresh !== null ? fresh : (cached ? cached.value : null);
   }
 
   // ---- طلبات الكتابة (POST) — عبر الطابور ----

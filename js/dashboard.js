@@ -33,7 +33,9 @@ function statusPillHtml(status) {
 
 async function renderDashboard() {
   const view = document.getElementById("dashboardView");
-  view.innerHTML = '<div class="loader">جاري تحميل الرئيسية…</div>';
+  if (!view.children.length) {
+    view.innerHTML = '<div class="loader">جاري تحميل الرئيسية…</div>';
+  }
 
   await Items.load();
   const branches = allowedBranchList();
