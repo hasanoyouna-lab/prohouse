@@ -6,7 +6,7 @@ const RETURN_THRESHOLD_DEFAULT   = 0.30;
 
 // الوجبة عند برو هاوس ~150 جرام — نحسب عدد الوجبات للأصناف اللي بتتوزن (دجاج/لحم/بحري) فقط
 const MEAL_WEIGHT_G = 150;
-const MEAL_CATEGORIES = ["دجاج", "لحم", "بحري"];
+const MEAL_CATEGORIES = ["دجاج", "لحم", "بحري", "ساندويتشات"];
 function isMealCategory(cat) { return MEAL_CATEGORIES.includes(cat); }
 function mealsCount(grams) {
   const n = Number(grams);

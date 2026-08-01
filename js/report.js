@@ -258,7 +258,8 @@ async function renderMealsSummary(days) {
 
   let totalReceivedMeals = 0, totalSoldMeals = 0, allHaveSales = true;
   const rows = relevantCats.map(cat => {
-    const receivedMeals = Number(mealsCount(receivedGramsByCat[cat] || 0)) || 0;
+    const rawRec = receivedGramsByCat[cat] || 0;
+    const receivedMeals = (cat === "ساندويتشات") ? Number(rawRec.toFixed(1)) : (Number(mealsCount(rawRec)) || 0);
     const hasSales = soldByCat[cat] !== undefined;
     const sold = hasSales ? soldByCat[cat] : 0;
     const remaining = receivedMeals - sold;
@@ -270,7 +271,7 @@ async function renderMealsSummary(days) {
   const totalRemaining = totalReceivedMeals - totalSoldMeals;
 
   container.innerHTML = `
-    <div class="cat-title">ملخص الوجبات (دجاج / لحم / بحري)</div>
+    <div class="cat-title">ملخص الوجبات والساندويتشات (دجاج / لحم / بحري / ساندويتشات)</div>
     <div class="dash-tile" style="margin-bottom:10px;">
       <div>
         <div class="lbl">إجمالي الوجبات المستلمة</div>
