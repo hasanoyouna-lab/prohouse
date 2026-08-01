@@ -1,5 +1,5 @@
 // ==================== سحب تلقائي لتقرير "المبيعات حسب التصنيف" من تابسنس ====================
-// سكربت أتمتة غير رسمي لسحب التقرير اليومي ليوم أمس وإرساله لـ Pro House.
+// سكربت أتمتة غير رسمي لسحب التقرير اليومي وإرساله لـ Pro House.
 
 const { chromium } = require("playwright");
 const fs = require("fs");
@@ -42,7 +42,6 @@ const UMM_ALI_PRODUCT_NAME = "ام علي";
 const UMM_ALI_TARGET_CATEGORY = "ساندويتشات";
 
 function getTargetDateStr() {
-  // إذا تم تحديد تاريخ معين بالأمر نسحبه، وإلا نأخذ تاريخ اليوم نفسه كافتراضي
   const customDate = process.argv[2]; // مثال: node pull-tabsense.js 07/30/2026
   if (customDate && /\d{2}\/\d{2}\/\d{4}/.test(customDate)) {
     const parts = customDate.split("/");
@@ -64,14 +63,12 @@ async function prepareReportPageAndSetDate(page, reportUrl, dateDisplay) {
   await page.goto(reportUrl, { waitUntil: "networkidle" });
   await page.waitForTimeout(2500);
 
-  // تحويل اللغة للعربية لو ظهر زر "ع"
   const arLangBtn = page.locator('a:has-text("ع"), button:has-text("ع")').first();
   if (await arLangBtn.isVisible().catch(() => false)) {
     await arLangBtn.click().catch(() => {});
     await page.waitForTimeout(2000);
   }
 
-  // ضبط حقل التاريخ والتطبيق
   await page.evaluate((d) => {
     const el = $('input[name="datefilter"]');
     if (el.length && el.data('daterangepicker')) {
@@ -99,14 +96,14 @@ async function extractCategoryTable(page) {
     if (!table) return [];
     const headers = Array.from(table.querySelectorAll('thead th, thead td')).map(th => th.innerText.trim());
     const catIdx = headers.findIndex(h => h.includes('التصنيف') || h.toLowerCase().includes('category'));
-    const qtyIdx = headers.findIndex(h => h.includes('الكمية') || h.toLowerCase().includes('qty') || h.toLowerCase().includes('quantity'));
+    const qtyIdx = headers.findIndex(h => h === 'الكمية' || h.toLowerCase() === 'qty' || h.toLowerCase() === 'quantity');
     
     const rows = [];
     const trs = Array.from(table.querySelectorAll('tbody tr'));
     for (const tr of trs) {
       const tds = Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim());
       if (tds[catIdx]) {
-        const qtyStr = tds[qtyIdx] ? tds[qtyIdx].replace(/,/g, '') : '0';
+        const qtyStr = tds[qtyIdx >= 0 ? qtyIdx : 4] ? tds[qtyIdx >= 0 ? qtyIdx : 4].replace(/,/g, '') : '0';
         rows.push({
           category: tds[catIdx],
           qty: parseFloat(qtyStr) || 0
@@ -118,21 +115,34 @@ async function extractCategoryTable(page) {
 }
 
 async function extractProductQty(page, productName) {
+  // تمديد الجدول لإظهار 100 عنصر لمنع حجب منتج أم علي بالصفحات التالية
+  await page.evaluate(() => {
+    const sel = document.querySelector('select[name*="length"]');
+    if (sel) {
+      sel.value = "100";
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  });
+  await page.waitForTimeout(1500);
+
   const products = await page.evaluate(() => {
     const table = document.querySelector('table');
     if (!table) return [];
     const headers = Array.from(table.querySelectorAll('thead th, thead td')).map(th => th.innerText.trim());
-    const nameIdx = headers.findIndex(h => h.includes('المنتج') || h.toLowerCase().includes('product') || h.toLowerCase().includes('item'));
-    const qtyIdx = headers.findIndex(h => h.includes('الكمية') || h.toLowerCase().includes('qty') || h.toLowerCase().includes('quantity'));
+    const nameIdx = headers.findIndex(h => h === 'المنتج' || h.toLowerCase() === 'product' || h.toLowerCase() === 'item');
+    const qtyIdx = headers.findIndex(h => h === 'الكمية' || h.toLowerCase() === 'qty' || h.toLowerCase() === 'quantity');
     
+    const targetQtyCol = qtyIdx >= 0 ? qtyIdx : 7;
+    const targetNameCol = nameIdx >= 0 ? nameIdx : 0;
+
     const rows = [];
     const trs = Array.from(table.querySelectorAll('tbody tr'));
     for (const tr of trs) {
       const tds = Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim());
-      if (tds[nameIdx]) {
-        const qtyStr = tds[qtyIdx] ? tds[qtyIdx].replace(/,/g, '') : '0';
+      if (tds[targetNameCol]) {
+        const qtyStr = tds[targetQtyCol] ? tds[targetQtyCol].replace(/,/g, '') : '0';
         rows.push({
-          name: tds[nameIdx],
+          name: tds[targetNameCol],
           qty: parseFloat(qtyStr) || 0
         });
       }
@@ -176,10 +186,11 @@ async function run() {
     console.log("🍩 جاري سحب تقرير المبيعات حسب المنتج لمنتج (أم علي)...");
     await prepareReportPageAndSetDate(page, PRODUCT_REPORT_URL, display);
     const ummAliQty = await extractProductQty(page, UMM_ALI_PRODUCT_NAME);
-    console.log(`كمية منتج أم علي المباعة: ${ummAliQty}`);
+    console.log(`كمية منتج أم علي المباعة ليوم ${display}: ${ummAliQty}`);
     
     const sandwichesFromUmmAli = ummAliQty / 2;
     if (sandwichesFromUmmAli > 0) {
+      console.log(`تم إضافة ${sandwichesFromUmmAli} ساندويتش من مبيعات أم علي (${ummAliQty} حبة).`);
       const existing = mappedRows.find(r => r.category === UMM_ALI_TARGET_CATEGORY);
       if (existing) existing.qty += sandwichesFromUmmAli;
       else mappedRows.push({ category: UMM_ALI_TARGET_CATEGORY, qty: sandwichesFromUmmAli });
