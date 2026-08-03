@@ -311,6 +311,40 @@ table.order-table td.total-cell{ font-weight:900; background:#FFF4D6; }
 
 .dash-links{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
 
+/* كرت "المطلوب منك الآن" — أول شي بالشاشة، كل سطر مهمة قابلة للضغط */
+.dash-tasks, .dash-flagged{
+  background:var(--card); border:2.5px solid var(--black); border-radius:var(--radius);
+  padding:14px; margin-bottom:18px; box-shadow:var(--shadow);
+}
+.dash-tasks-title{ font-size:13.5px; font-weight:900; margin-bottom:10px; }
+.dash-tasks-done{ font-size:12.5px; font-weight:700; color:var(--green); }
+.dash-task{
+  display:flex; align-items:center; gap:10px; width:100%; text-align:right;
+  background:var(--surface2); border:2px solid var(--black); border-radius:11px;
+  padding:11px 12px; margin-bottom:8px; cursor:pointer; font-family:inherit;
+  transition:transform .12s var(--ease), background .12s var(--ease);
+}
+.dash-task:last-child{ margin-bottom:0; }
+.dash-task:hover{ transform:translate(-2px,-2px); background:var(--yellow); }
+.dash-task:active{ transform:translate(1px,1px); }
+.dash-task-icon{ font-size:16px; }
+.dash-task-text{ flex:1; font-size:12.5px; font-weight:800; }
+.dash-task-go{ font-size:20px; font-weight:900; transform:scaleX(-1); }
+
+.dash-flagged{ cursor:pointer; }
+.dash-flagged-row{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:8px 0; border-top:1.5px dashed var(--surface2); font-size:12.5px; font-weight:700;
+}
+.dash-flagged-row:first-of-type{ border-top:none; }
+
+.dash-trend{ font-size:11px; font-weight:800; color:var(--gray); }
+.dash-trend.up{ color:var(--green); }
+.dash-trend.down{ color:var(--red); }
+
+/* ==================== جرد العصيرات ==================== */
+.juice-card .badges{ margin-top:6px; }
+
 /* ==================== فئات قابلة للطي بشاشة إدخال اليوم ==================== */
 .category-section{ margin-bottom:16px; }
 .category-header{

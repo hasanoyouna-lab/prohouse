@@ -1,4 +1,6 @@
 // ==================== الرئيسية (Dashboard) ====================
+// المبدأ: الشاشة تقول للموظف "شو المطلوب منك الحين" قبل ما تعرض أرقام.
+// كل سطر بكرت المهام قابل للضغط وبيوديك للمكان المطلوب مباشرة.
 
 function branchVisibleItems(branch) {
   return Items.current.filter(item => {
@@ -7,10 +9,35 @@ function branchVisibleItems(branch) {
   });
 }
 
+// مجموع الوجبات المستلمة (الأصناف اللي بتتوزن فقط) لهذا اليوم — نفس معادلة شاشة الاستلام
+function mealsFromDayItems(dayItems) {
+  const catById = {};
+  Items.current.forEach(it => { catById[it.id] = it.category; });
+  let grams = 0;
+  (dayItems || []).forEach(it => {
+    if (!isMealCategory(catById[it.itemId])) return;
+    const n = Number(it.received);
+    if (it.received !== "" && it.received != null && !isNaN(n)) grams += n;
+  });
+  return grams / MEAL_WEIGHT_G;
+}
+
 async function loadBranchStatus(branch) {
   const visible = branchVisibleItems(branch);
-  const data = await Sync.get("getDay", { date: todayStr(), branch }, "day:" + todayStr() + ":" + branch);
-  const items = (data && data.items) || [];
+  const today = todayStr();
+  const yesterday = addDaysStr(today, -1);
+  const tomorrow = addDaysStr(today, 1);
+
+  const [dayData, yesterdayData, tomorrowOrder, juiceDay] = await Promise.all([
+    Sync.get("getDay", { date: today, branch }, "day:" + today + ":" + branch),
+    Sync.get("getDay", { date: yesterday, branch }, "day:" + yesterday + ":" + branch),
+    Sync.get("getTomorrowOrder", { date: tomorrow, branch }, "tomorrow:" + tomorrow + ":" + branch),
+    tabAllowed("juices")
+      ? Sync.get("getJuiceDay", { date: today, branch }, "juiceday:" + today + ":" + branch)
+      : Promise.resolve(null)
+  ]);
+
+  const items = (dayData && dayData.items) || [];
   const confirmedIds = new Set(items.filter(it => it.confirmed === true || it.confirmed === "TRUE").map(it => it.itemId));
   const touchedIds = new Set(items.filter(it => it.received !== "" && it.received != null).map(it => it.itemId));
 
@@ -22,7 +49,17 @@ async function loadBranchStatus(branch) {
   if (touched > 0 && confirmed >= total && total > 0) status = "done";
   else if (touched > 0) status = "partial";
 
-  return { branch, total, confirmed, touched, status };
+  const juicesTotal = typeof visibleJuicesFor === "function" ? visibleJuicesFor(branch).length : 0;
+  const juicesCounted = ((juiceDay && juiceDay.items) || [])
+    .filter(r => r.counted !== "" && r.counted != null && !isNaN(Number(r.counted))).length;
+
+  return {
+    branch, total, confirmed, touched, status,
+    mealsToday: mealsFromDayItems(items),
+    mealsYesterday: mealsFromDayItems((yesterdayData && yesterdayData.items) || []),
+    tomorrowSaved: !!(tomorrowOrder && tomorrowOrder.length),
+    juicesTotal, juicesCounted
+  };
 }
 
 function statusPillHtml(status) {
@@ -31,47 +68,111 @@ function statusPillHtml(status) {
   return `<span class="status-pill none">— لم يبدأ</span>`;
 }
 
+// سهم الاتجاه مقارنة بأمس — الاتجاه أهم من الرقم المطلق
+function trendHtml(today, yesterday) {
+  if (!today && !yesterday) return "";
+  const t = Math.round(today);
+  if (!yesterday) return `<span class="dash-trend">🍽 ${t} وجبة اليوم</span>`;
+  const y = Math.round(yesterday);
+  const diff = t - y;
+  const cls = diff > 0 ? "up" : diff < 0 ? "down" : "flat";
+  const arrow = diff > 0 ? "▲" : diff < 0 ? "▼" : "＝";
+  return `<span class="dash-trend ${cls}">🍽 ${t} وجبة (أمس ${y} ${arrow}${diff !== 0 ? Math.abs(diff) : ""})</span>`;
+}
+
+// كرت "المطلوب منك الآن" — كل مهمة سطر قابل للضغط، وبيختفي أول ما تخلص
+function buildTasks(statuses) {
+  const tasks = [];
+  statuses.forEach(s => {
+    if (!Auth.canEditBranch(s.branch)) return; // الشيف/المالك بيشوفوا كل الفروع بس المهام لأصحابها
+    const label = statuses.length > 1 ? ` — ${s.branch}` : "";
+
+    const remaining = s.total - s.confirmed;
+    if (remaining > 0) {
+      tasks.push({ icon: "📝", text: `باقي ${remaining} صنف ما تأكّد استلامه${label}`, tab: "entry", branch: s.branch });
+    }
+    if (!s.tomorrowSaved) {
+      tasks.push({ icon: "📦", text: `طلبية الغد ما انحفظت${label}`, tab: "tomorrow", branch: s.branch });
+    }
+    if (tabAllowed("juices") && s.juicesTotal > 0 && s.juicesCounted < s.juicesTotal) {
+      tasks.push({ icon: "🥤", text: `جرد العصيرات ما اكتمل (${s.juicesCounted}/${s.juicesTotal})${label}`, tab: "juices", branch: s.branch });
+    }
+  });
+  return tasks;
+}
+
 async function renderDashboard() {
   const view = document.getElementById("dashboardView");
   if (!view.children.length) {
     view.innerHTML = '<div class="loader">جاري تحميل الرئيسية…</div>';
   }
 
-  await Items.load();
+  await Promise.all([Items.load(), tabAllowed("juices") ? Juices.load() : Promise.resolve()]);
   const branches = allowedBranchList();
   const statuses = await Promise.all(branches.map(loadBranchStatus));
 
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "صباح الخير" : hour < 17 ? "مساء الخير" : "مساء الخير";
+  const greeting = hour < 12 ? "صباح الخير" : "مساء الخير";
+  const name = (Auth.getEmployee() || {}).name || "";
 
-  let flaggedCount = 0;
+  // الأصناف المرتفعة الإرجاع — بالاسم مو مجرد رقم، لأن الرقم لحاله ما بيخلي حدا يتصرف
+  let flagged = [];
   if (Auth.canSeeReports()) {
     const monthStart = todayStr().slice(0, 7) + "-01";
     const monthEnd = todayStr();
     const reportData = await Sync.get("getReport", { start: monthStart, end: monthEnd }, "report:" + monthStart + ":" + monthEnd);
-    flaggedCount = (reportData && reportData.flaggedCount) || 0;
+    flagged = ((reportData && reportData.totals) || [])
+      .filter(t => t.flagged)
+      .sort((a, b) => b.returnPct - a.returnPct)
+      .slice(0, 5);
   }
 
-  const pending = Sync.getQueue().length;
+  const tasks = buildTasks(statuses);
 
   view.innerHTML = `
-    <div class="dash-greeting">${greeting} 👋</div>
+    <div class="dash-greeting">${greeting}${name ? " " + name : ""} 👋</div>
     <div class="dash-date">${new Date().toLocaleDateString("ar-EG", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</div>
+
+    <div class="dash-tasks" id="dashTasks">
+      <div class="dash-tasks-title">${tasks.length ? "المطلوب منك الآن" : "خلّصت كل شي لليوم"}</div>
+      ${tasks.length
+        ? tasks.map((t, i) => `
+            <button class="dash-task" data-task="${i}">
+              <span class="dash-task-icon">${t.icon}</span>
+              <span class="dash-task-text">${t.text}</span>
+              <span class="dash-task-go">›</span>
+            </button>`).join("")
+        : '<div class="dash-tasks-done">✅ الاستلام مؤكّد، طلبية الغد محفوظة، والجرد مكتمل.</div>'}
+    </div>
 
     <div class="dash-grid" id="dashBranchGrid"></div>
 
     ${Auth.canSeeReports() ? `
-    <div class="dash-tile" id="dashFlaggedTile">
-      <div class="lbl">عدد الأصناف بنسبة إرجاع مرتفعة هذا الشهر (هدر محتمل)</div>
-      <div class="big">${flaggedCount}</div>
+    <div class="dash-flagged" id="dashFlagged">
+      <div class="dash-tasks-title">أعلى نسب إرجاع هذا الشهر (هدر محتمل)</div>
+      ${flagged.length
+        ? flagged.map(t => `
+            <div class="dash-flagged-row">
+              <span>${t.itemName}</span>
+              <span class="badge warn">${Math.round(t.returnPct * 100)}%</span>
+            </div>`).join("")
+        : '<div class="dash-tasks-done">✅ ما في صنف تجاوز حد الإرجاع هذا الشهر.</div>'}
     </div>` : ""}
-
-    <div class="dash-links">
-      <button class="btn primary" id="dashGotoEntry">📝 طلبية اليوم</button>
-      <button class="btn" id="dashGotoTomorrow">📦 طلبية الغد</button>
-      ${Auth.canSeeReports() ? '<button class="btn" id="dashGotoReport">📊 التقارير</button>' : ""}
-    </div>
   `;
+
+  document.querySelectorAll(".dash-task").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const t = tasks[Number(btn.dataset.task)];
+      Branch.set(t.branch);
+      document.querySelector(`.tab-btn[data-tab="${t.tab}"]`).click();
+    });
+  });
+
+  if (Auth.canSeeReports()) {
+    document.getElementById("dashFlagged").addEventListener("click", () => {
+      document.querySelector('.tab-btn[data-tab="report"]').click();
+    });
+  }
 
   const grid = document.getElementById("dashBranchGrid");
   statuses.forEach(s => {
@@ -83,6 +184,7 @@ async function renderDashboard() {
       ${statusPillHtml(s.status)}
       <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
       <div style="font-size:11px;color:var(--gray);">${s.confirmed}/${s.total} صنف مؤكّد</div>
+      ${trendHtml(s.mealsToday, s.mealsYesterday)}
     `;
     card.addEventListener("click", () => {
       Branch.set(s.branch);
@@ -90,15 +192,6 @@ async function renderDashboard() {
     });
     grid.appendChild(card);
   });
-
-  if (Auth.canSeeReports()) {
-    document.getElementById("dashFlaggedTile").addEventListener("click", () => {
-      document.querySelector('.tab-btn[data-tab="report"]').click();
-    });
-    document.getElementById("dashGotoReport").addEventListener("click", () => document.querySelector('.tab-btn[data-tab="report"]').click());
-  }
-  document.getElementById("dashGotoEntry").addEventListener("click", () => document.querySelector('.tab-btn[data-tab="entry"]').click());
-  document.getElementById("dashGotoTomorrow").addEventListener("click", () => document.querySelector('.tab-btn[data-tab="tomorrow"]').click());
 }
 
 function initDashboardTab() {
