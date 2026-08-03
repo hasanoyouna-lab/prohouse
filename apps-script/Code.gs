@@ -8,6 +8,9 @@
  *   Employees:      name, active, id, pin, role, branches   (roles: owner, manager, chef, employee)
  *   Sessions:       token, employeeId, createdAt, expiresAt
  *   TabsenseSales:  date, branch, category, qty, importedAt
+ *   Juices:         id, name, unit, tabsenseName, branches, active, sortOrder, updatedAt
+ *   JuiceCounts:    date, branch, juiceId, juiceName, unit, opening, added, sold, counted, notes, employeeName, savedAt
+ *   JuiceSales:     date, branch, productName, qty, importedAt
  *   Settings:       key, value
  *
  * Deploy: Deploy > New deployment > Web app > Execute as: Me > Who has access: Anyone.
@@ -23,6 +26,9 @@ var SHEET_NAMES = {
   EMPLOYEES: 'Employees',
   SESSIONS: 'Sessions',
   TABSENSE: 'TabsenseSales',
+  JUICES: 'Juices',
+  JUICE_COUNTS: 'JuiceCounts',
+  JUICE_SALES: 'JuiceSales',
   SETTINGS: 'Settings'
 };
 
@@ -37,6 +43,9 @@ var SHEET_HEADERS = {
   Employees: ['name', 'active', 'id', 'pin', 'role', 'branches'],
   Sessions: ['token', 'employeeId', 'createdAt', 'expiresAt'],
   TabsenseSales: ['date', 'branch', 'category', 'qty', 'importedAt'],
+  Juices: ['id', 'name', 'unit', 'tabsenseName', 'branches', 'active', 'sortOrder', 'updatedAt'],
+  JuiceCounts: ['date', 'branch', 'juiceId', 'juiceName', 'unit', 'opening', 'added', 'sold', 'counted', 'notes', 'employeeName', 'savedAt'],
+  JuiceSales: ['date', 'branch', 'productName', 'qty', 'importedAt'],
   Settings: ['key', 'value', 'updatedAt']
 };
 
@@ -218,6 +227,16 @@ function doGet(e) {
         data = getEmployees();
         break;
       case 'getSettings': data = getSettings(); break;
+      case 'getJuices': data = getJuices(e.parameter.all === '1'); break;
+      case 'getJuiceDay':
+        requireBranchAccess_(employee, e.parameter.branch);
+        data = getJuiceDay(e.parameter.date, e.parameter.branch);
+        break;
+      case 'getJuiceReport':
+        if (employee.role === 'employee') throw new Error('غير مصرح');
+        requireBranchAccess_(employee, e.parameter.branch);
+        data = getJuiceReport(e.parameter.start, e.parameter.end, e.parameter.branch);
+        break;
       case 'getSalesByCategory':
         if (employee.role === 'employee') throw new Error('غير مصرح');
         requireBranchAccess_(employee, e.parameter.branch);
@@ -249,6 +268,10 @@ function doPost(e) {
       requireIntegrationToken_(body.integrationToken);
       return jsonOut({ ok: true, data: importSalesByCategory(body.payload) });
     }
+    if (body.action === 'importJuiceSales') {
+      requireIntegrationToken_(body.integrationToken);
+      return jsonOut({ ok: true, data: importJuiceSales(body.payload) });
+    }
 
     var employee = requireSession_(body.token);
     var data;
@@ -270,6 +293,19 @@ function doPost(e) {
         if (employee.role === 'chef') throw new Error('غير مصرح — الشيف يشوف بس');
         requireBranchAccess_(employee, body.payload.branch);
         data = saveTomorrowOrder(body.payload);
+        break;
+      case 'saveJuice':
+        requireJuiceWriteAccess_(employee, body.payload);
+        data = saveJuice(body.payload);
+        break;
+      case 'deleteJuice':
+        requireJuiceDeleteAccess_(employee, body.payload);
+        data = deleteJuice(body.payload);
+        break;
+      case 'saveJuiceDay':
+        if (employee.role === 'chef') throw new Error('غير مصرح — الشيف يشوف بس');
+        requireBranchAccess_(employee, body.payload.branch);
+        data = saveJuiceDay(body.payload);
         break;
       case 'saveSettings':
         if (employee.role !== 'owner') throw new Error('غير مصرح');
@@ -387,6 +423,24 @@ function requireItemDeleteAccess_(emp, payload) {
   if (!item) throw new Error('الصنف غير موجود');
   var b = String(item.branches || '').trim();
   if (!b || emp.branches.indexOf(b) === -1) throw new Error('غير مصرح بحذف هذا الصنف');
+}
+
+// نفس منطق الأصناف: الموظف/المدير بيتحكم بس بعصيرات موسومة بفرع واحد من فروعه،
+// والعصيرات المشتركة (branches فاضي = كل الفروع) للمالك بس.
+function requireJuiceWriteAccess_(emp, payload) {
+  if (emp.role === 'owner') return;
+  if (emp.role === 'chef') throw new Error('غير مصرح');
+  var b = String(payload.branches || '').trim();
+  if (!b || emp.branches.indexOf(b) === -1) throw new Error('لازم تحدد فرعك بالعصير — غير مصرح بتعديل عصيرات مشتركة أو فروع تانية');
+}
+
+function requireJuiceDeleteAccess_(emp, payload) {
+  if (emp.role === 'owner') return;
+  if (emp.role === 'chef') throw new Error('غير مصرح');
+  var j = readRows(SHEET_NAMES.JUICES).rows.filter(function (x) { return x.id === payload.id; })[0];
+  if (!j) throw new Error('العصير غير موجود');
+  var b = String(j.branches || '').trim();
+  if (!b || emp.branches.indexOf(b) === -1) throw new Error('غير مصرح بحذف هذا العصير');
 }
 
 // ==================== helpers ====================
@@ -640,6 +694,126 @@ function getSalesByCategory(start, end, branch) {
   });
 }
 
+// ==================== جرد العصيرات ====================
+//
+// المعادلة لكل عصير بكل يوم بكل فرع:
+//   المتوقع = الرصيد الافتتاحي + الإضافات − المبيعات
+//   الفرق   = العدّ الفعلي − المتوقع        (سالب = نقص/هدر، موجب = زيادة غير مفسّرة)
+// الرصيد الافتتاحي بينحسب تلقائياً من "العدّ الفعلي" لليوم السابق لنفس الفرع (سلسلة متصلة)،
+// وبيقدر الموظف يعدّله يدوياً لو صار جرد افتتاحي مختلف.
+
+function addDaysIso_(dateStr, delta) {
+  var d = new Date(String(dateStr) + 'T00:00:00');
+  d.setDate(d.getDate() + delta);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function getJuices(all) {
+  var rows = readRows(SHEET_NAMES.JUICES).rows;
+  if (!all) rows = rows.filter(function (j) { return j.active === true || j.active === 'TRUE'; });
+  rows.sort(function (a, b) { return Number(a.sortOrder) - Number(b.sortOrder); });
+  return rows;
+}
+
+function saveJuice(p) {
+  var r = readRows(SHEET_NAMES.JUICES);
+  if (!p.id) p.id = Utilities.getUuid();
+  var isNew = !r.rows.some(function (row) { return row.id === p.id; });
+  p.updatedAt = nowIso();
+  if (isNew) {
+    appendRow(SHEET_NAMES.JUICES, {
+      id: p.id, name: p.name, unit: p.unit || '', tabsenseName: p.tabsenseName || '',
+      branches: p.branches || '', active: true, sortOrder: p.sortOrder || 0, updatedAt: p.updatedAt
+    });
+  } else {
+    for (var i = 0; i < r.rows.length; i++) {
+      if (r.rows[i].id === p.id) {
+        var rowNum = i + 2;
+        r.headers.forEach(function (h, c) {
+          if (p.hasOwnProperty(h)) r.sh.getRange(rowNum, c + 1).setValue(p[h]);
+        });
+        break;
+      }
+    }
+  }
+  return { id: p.id };
+}
+
+function deleteJuice(p) {
+  var r = readRows(SHEET_NAMES.JUICES);
+  for (var i = 0; i < r.rows.length; i++) {
+    if (r.rows[i].id === p.id) {
+      r.sh.getRange(i + 2, r.headers.indexOf('active') + 1).setValue(false);
+      r.sh.getRange(i + 2, r.headers.indexOf('updatedAt') + 1).setValue(nowIso());
+      break;
+    }
+  }
+  return { id: p.id };
+}
+
+function getJuiceDay(date, branch) {
+  var all = readRows(SHEET_NAMES.JUICE_COUNTS).rows;
+  var items = all.filter(function (r) { return r.date === date && r.branch === branch; });
+
+  // إقفال أمس = افتتاحي اليوم (يتعبّى تلقائياً لما الموظف ما دخّل افتتاحي بإيده)
+  var prevDate = addDaysIso_(date, -1);
+  var prevCounted = {};
+  all.filter(function (r) { return r.date === prevDate && r.branch === branch; })
+    .forEach(function (r) { prevCounted[r.juiceId] = r.counted; });
+
+  var sales = readRows(SHEET_NAMES.JUICE_SALES).rows
+    .filter(function (r) { return r.date === date && r.branch === branch; })
+    .map(function (r) { return { productName: r.productName, qty: r.qty }; });
+
+  return { date: date, branch: branch, items: items, prevCounted: prevCounted, sales: sales };
+}
+
+function saveJuiceDay(p) {
+  deleteRowsWhere(SHEET_NAMES.JUICE_COUNTS, function (row) { return row.date === p.date && row.branch === p.branch; });
+  var savedAt = nowIso();
+  (p.items || []).forEach(function (it) {
+    appendRow(SHEET_NAMES.JUICE_COUNTS, {
+      date: p.date, branch: p.branch, juiceId: it.juiceId, juiceName: it.juiceName, unit: it.unit || '',
+      opening: it.opening, added: it.added, sold: it.sold, counted: it.counted,
+      notes: it.notes || '', employeeName: p.employeeName || '', savedAt: savedAt
+    });
+  });
+  return { date: p.date, branch: p.branch, savedAt: savedAt };
+}
+
+// بيستبدل مبيعات نفس اليوم+الفرع كل مرة ينسحب فيها (last-write-wins، نفس نمط باقي البيانات اليومية)
+function importJuiceSales(p) {
+  deleteRowsWhere(SHEET_NAMES.JUICE_SALES, function (row) { return row.date === p.date && row.branch === p.branch; });
+  var importedAt = nowIso();
+  (p.rows || []).forEach(function (r) {
+    appendRow(SHEET_NAMES.JUICE_SALES, { date: p.date, branch: p.branch, productName: r.productName, qty: r.qty, importedAt: importedAt });
+  });
+  return { date: p.date, branch: p.branch, count: (p.rows || []).length, importedAt: importedAt };
+}
+
+// تجميع فترة: كم انضاف، كم انباع، وكم الفرق التراكمي لكل عصير (لتقرير الهدر)
+function getJuiceReport(start, end, branch) {
+  var rows = readRows(SHEET_NAMES.JUICE_COUNTS).rows.filter(function (r) {
+    return r.date >= start && r.date <= end && (!branch || r.branch === branch);
+  });
+  var map = {};
+  rows.forEach(function (r) {
+    var key = r.juiceId;
+    if (!map[key]) map[key] = { juiceId: r.juiceId, juiceName: r.juiceName, unit: r.unit, totalAdded: 0, totalSold: 0, totalVariance: 0, days: 0 };
+    var t = map[key];
+    var opening = Number(r.opening) || 0;
+    var added = Number(r.added) || 0;
+    var sold = Number(r.sold) || 0;
+    t.totalAdded += added;
+    t.totalSold += sold;
+    if (r.counted !== '' && r.counted !== null && !isNaN(Number(r.counted))) {
+      t.totalVariance += Number(r.counted) - (opening + added - sold);
+      t.days += 1;
+    }
+  });
+  return Object.keys(map).map(function (k) { return map[k]; });
+}
+
 // ==================== Employees / Settings ====================
 
 function getEmployees() {
@@ -681,6 +855,9 @@ function backupAll() {
     tomorrowOrders: readRows(SHEET_NAMES.TOMORROW).rows,
     employees: readRows(SHEET_NAMES.EMPLOYEES).rows,
     tabsenseSales: readRows(SHEET_NAMES.TABSENSE).rows,
+    juices: readRows(SHEET_NAMES.JUICES).rows,
+    juiceCounts: readRows(SHEET_NAMES.JUICE_COUNTS).rows,
+    juiceSales: readRows(SHEET_NAMES.JUICE_SALES).rows,
     settings: readRows(SHEET_NAMES.SETTINGS).rows,
     exportedAt: nowIso()
   };
@@ -746,6 +923,9 @@ function restoreAll(p) {
   replaceSheet(SHEET_NAMES.TOMORROW, p.tomorrowOrders);
   replaceSheet(SHEET_NAMES.EMPLOYEES, p.employees);
   replaceSheet(SHEET_NAMES.TABSENSE, p.tabsenseSales);
+  replaceSheet(SHEET_NAMES.JUICES, p.juices);
+  replaceSheet(SHEET_NAMES.JUICE_COUNTS, p.juiceCounts);
+  replaceSheet(SHEET_NAMES.JUICE_SALES, p.juiceSales);
   replaceSheet(SHEET_NAMES.SETTINGS, p.settings);
   return { restoredAt: nowIso() };
 }

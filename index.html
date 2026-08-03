@@ -41,6 +41,7 @@
     <button class="tab-btn active" data-tab="dashboard">🏠 الرئيسية</button>
     <button class="tab-btn" data-tab="entry">📝 طلبية اليوم</button>
     <button class="tab-btn" data-tab="tomorrow">📦 طلبية الغد</button>
+    <button class="tab-btn" data-tab="juices">🥤 جرد العصيرات</button>
     <button class="tab-btn" data-tab="report">📊 التقارير</button>
     <button class="tab-btn" data-tab="items">🍽 إدارة الأصناف</button>
     <button class="tab-btn" data-tab="settings">⚙ الإعدادات</button>
@@ -52,6 +53,9 @@
   <div class="datebar hidden" id="tomorrowDateBar">
     <input type="date" id="tomorrowDateInput">
   </div>
+  <div class="datebar hidden" id="juiceDateBar">
+    <input type="date" id="juiceDateInput">
+  </div>
 </header>
 
 <main>
@@ -62,6 +66,8 @@
   <div id="entryView" class="view hidden"></div>
 
   <div id="tomorrowView" class="view hidden"></div>
+
+  <div id="juicesView" class="view hidden"></div>
 
   <div id="reportContainer" class="view hidden">
     <div class="toolbar">
@@ -124,6 +130,11 @@
   <button class="save-btn" id="tomorrowSaveBtn">💾 حفظ الطلبية</button>
 </div>
 
+<div class="save-bar hidden" id="saveBarJuices">
+  <div class="save-status" id="juiceStatus">لسا ما تحفظ جرد لهذا اليوم</div>
+  <button class="save-btn" id="juiceSaveBtn">💾 حفظ الجرد</button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
@@ -134,6 +145,7 @@
 <script src="js/entry.js"></script>
 <script src="js/items.js"></script>
 <script src="js/tomorrow.js"></script>
+<script src="js/juices.js"></script>
 <script src="js/report.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/dashboard.js"></script>

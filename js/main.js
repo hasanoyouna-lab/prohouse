@@ -4,6 +4,7 @@ const TAB_ROLE_ACCESS = {
   dashboard: ["owner", "manager", "chef", "employee"],
   entry: ["owner", "manager", "chef", "employee"],
   tomorrow: ["owner", "manager", "chef", "employee"],
+  juices: ["owner", "manager", "employee"],
   report: ["owner", "manager", "chef"],
   items: ["owner", "manager", "employee"],
   settings: ["owner"]
@@ -22,17 +23,22 @@ function setActiveTab(tab) {
   document.getElementById("dashboardView").classList.toggle("hidden", tab !== "dashboard");
   document.getElementById("entryView").classList.toggle("hidden", tab !== "entry");
   document.getElementById("tomorrowView").classList.toggle("hidden", tab !== "tomorrow");
+  document.getElementById("juicesView").classList.toggle("hidden", tab !== "juices");
   document.getElementById("reportContainer").classList.toggle("hidden", tab !== "report");
   document.getElementById("itemsView").classList.toggle("hidden", tab !== "items");
   document.getElementById("settingsView").classList.toggle("hidden", tab !== "settings");
 
   document.getElementById("entryDateBar").classList.toggle("hidden", tab !== "entry");
   document.getElementById("tomorrowDateBar").classList.toggle("hidden", tab !== "tomorrow");
+  document.getElementById("juiceDateBar").classList.toggle("hidden", tab !== "juices");
 
   document.getElementById("saveBarEntry").classList.toggle("hidden", tab !== "entry" || Auth.isViewOnlyEntry());
   document.getElementById("saveBarTomorrow").classList.toggle("hidden", tab !== "tomorrow" || Auth.isViewOnlyTomorrow());
+  document.getElementById("saveBarJuices").classList.toggle("hidden", tab !== "juices" || Auth.isViewOnlyEntry());
 
   if (tab === "dashboard") { renderDashboard(); }
+  // الفرع ممكن يكون تغيّر من شاشة تانية (كرت الفرع بالرئيسية) — نعيد التحميل بس وقتها
+  if (tab === "juices" && currentJuiceBranch !== Branch.get()) { loadJuiceDay(currentJuiceDate); }
   if (tab === "items") { Items.load().then(renderItemsAdminView); }
   if (tab === "settings") { Promise.all([loadSettings(), Items.load()]).then(renderSettingsView); }
 }
@@ -114,6 +120,7 @@ function startApp() {
   initDashboardTab();
   initEntryTab();
   initTomorrowTab();
+  if (tabAllowed("juices")) initJuicesTab();
   initReportTab();
   setActiveTab("dashboard");
 }

@@ -44,6 +44,12 @@ const CATEGORY_MAP = {
 const UMM_ALI_PRODUCT_NAME = "ام علي";
 const UMM_ALI_TARGET_CATEGORY = "ساندويتشات";
 
+// تصنيفات تابسنس اللي منتجاتها بتعتبر عصيرات — بتتبعت لصفحة "جرد العصيرات" بالاسم.
+// تقدر تغيّرها من config.json (juiceCategories) بدون ما تلمس الكود.
+const DEFAULT_JUICE_CATEGORIES = ["العصائر", "عصائر", "المشروبات", "مشروبات", "Juices", "Juice", "Beverages", "Drinks"];
+// احتياط لو تقرير المنتجات ما فيه عمود تصنيف أصلاً — بنعتمد على الاسم
+const JUICE_NAME_HINTS = ["عصير", "juice"];
+
 function getTargetDateStr() {
   const customDate = process.argv[2]; // مثال: node pull-tabsense.js 07/30/2026
   if (customDate && /\d{2}\/\d{2}\/\d{4}/.test(customDate)) {
@@ -117,8 +123,10 @@ async function extractCategoryTable(page) {
   });
 }
 
-async function extractProductQty(page, productName) {
-  // تمديد الجدول لإظهار 100 عنصر لمنع حجب منتج أم علي بالصفحات التالية
+// بنسحب جدول المنتجات مرة وحدة بس ونشتق منه كل شي (أم علي + العصيرات) —
+// أرخص من فتح نفس الصفحة مرتين، وبيضمن إن الرقمين من نفس اللقطة الزمنية.
+async function extractProductTable(page) {
+  // تمديد الجدول لإظهار 100 عنصر لمنع حجب منتجات بالصفحات التالية
   await page.evaluate(() => {
     const sel = document.querySelector('select[name*="length"]');
     if (sel) {
@@ -128,13 +136,14 @@ async function extractProductQty(page, productName) {
   });
   await page.waitForTimeout(1500);
 
-  const products = await page.evaluate(() => {
+  return await page.evaluate(() => {
     const table = document.querySelector('table');
     if (!table) return [];
     const headers = Array.from(table.querySelectorAll('thead th, thead td')).map(th => th.innerText.trim());
     const nameIdx = headers.findIndex(h => h === 'المنتج' || h.toLowerCase() === 'product' || h.toLowerCase() === 'item');
     const qtyIdx = headers.findIndex(h => h === 'الكمية' || h.toLowerCase() === 'qty' || h.toLowerCase() === 'quantity');
-    
+    const catIdx = headers.findIndex(h => h.includes('التصنيف') || h.toLowerCase().includes('category'));
+
     const targetQtyCol = qtyIdx >= 0 ? qtyIdx : 7;
     const targetNameCol = nameIdx >= 0 ? nameIdx : 0;
 
@@ -146,16 +155,30 @@ async function extractProductQty(page, productName) {
         const qtyStr = tds[targetQtyCol] ? tds[targetQtyCol].replace(/,/g, '') : '0';
         rows.push({
           name: tds[targetNameCol],
+          category: catIdx >= 0 ? (tds[catIdx] || '') : '',
           qty: parseFloat(qtyStr) || 0
         });
       }
     }
     return rows;
   });
+}
 
+function findProductQty(products, productName) {
   const target = normalizeArabic(productName);
   const found = products.find(p => normalizeArabic(p.name) === target || normalizeArabic(p.name).includes("ام علي"));
   return found ? found.qty : 0;
+}
+
+function pickJuiceRows(products, juiceCategories) {
+  const cats = juiceCategories.map(c => normalizeArabic(c).toLowerCase());
+  const byCategory = products.filter(p => p.category && cats.includes(normalizeArabic(p.category).toLowerCase()));
+  if (byCategory.length) return byCategory.map(p => ({ productName: p.name, qty: p.qty }));
+
+  // ما في عمود تصنيف (أو ما طابق شي) — نرجع للاسم كاحتياط
+  return products
+    .filter(p => JUICE_NAME_HINTS.some(h => normalizeArabic(p.name).toLowerCase().includes(h)))
+    .map(p => ({ productName: p.name, qty: p.qty }));
 }
 
 async function run() {
@@ -194,10 +217,11 @@ async function run() {
       }
     });
 
-    // ---- 2) تقرير "المبيعات حسب المنتج" لـ "أم علي" ----
-    console.log("🍩 جاري سحب تقرير المبيعات حسب المنتج لمنتج (أم علي)...");
+    // ---- 2) تقرير "المبيعات حسب المنتج" (منه: أم علي + مبيعات العصيرات) ----
+    console.log("🍩 جاري سحب تقرير المبيعات حسب المنتج...");
     await prepareReportPageAndSetDate(page, PRODUCT_REPORT_URL, display);
-    const ummAliQty = await extractProductQty(page, UMM_ALI_PRODUCT_NAME);
+    const products = await extractProductTable(page);
+    const ummAliQty = findProductQty(products, UMM_ALI_PRODUCT_NAME);
     console.log(`كمية منتج أم علي المباعة ليوم ${display}: ${ummAliQty}`);
     
     const sandwichesFromUmmAli = ummAliQty / 2;
@@ -221,6 +245,27 @@ async function run() {
     });
     const json = await res.json();
     if (!json.ok) throw new Error("رفض السيرفر البيانات: " + json.error);
+
+    // ---- 4) مبيعات العصيرات (لصفحة جرد العصيرات) ----
+    const juiceRows = pickJuiceRows(products, config.juiceCategories || DEFAULT_JUICE_CATEGORIES);
+    if (juiceRows.length) {
+      console.log(`🥤 جاري إرسال مبيعات ${juiceRows.length} عصير...`);
+      const juiceRes = await fetch(config.prohouseApiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action: "importJuiceSales",
+          integrationToken: config.integrationToken,
+          payload: { date: iso, branch: config.branch, rows: juiceRows }
+        })
+      });
+      const juiceJson = await juiceRes.json();
+      // فشل العصيرات ما لازم يلغي نجاح مبيعات التصنيفات اللي انبعتت فوق — بنسجّله وبنكمل
+      if (!juiceJson.ok) console.warn("⚠ فشل إرسال مبيعات العصيرات:", juiceJson.error);
+      else console.log("🥤 تم إرسال مبيعات العصيرات:", juiceRows);
+    } else {
+      console.log("🥤 ما لقينا منتجات عصيرات بتقرير المنتجات — تأكد من juiceCategories بـ config.json");
+    }
 
     console.log(`🎉 تم سحب وإرسال بيانات ${iso} لفرع ${config.branch} بنجاح!`, mappedRows);
   } catch (err) {
