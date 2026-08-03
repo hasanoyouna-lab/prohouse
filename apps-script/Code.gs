@@ -445,9 +445,20 @@ function requireJuiceDeleteAccess_(emp, payload) {
 
 // ==================== helpers ====================
 
+// أي تبويب ناقص بينعمل لحاله بعناوينه الصحيحة أول ما ينطلب — قبل هيك كان بيرمي خطأ ولازم
+// حدا يفتح الشيت ويشغّل setupEverything يدوياً بعد كل تحديث بيضيف جدول جديد. هيك أي جدول
+// جديد مستقبلاً بينشأ تلقائياً بدون ما حدا يلمس الشيت.
 function sheet(name) {
-  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
-  if (!sh) throw new Error('missing sheet tab: ' + name);
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(name);
+  if (sh) return sh;
+
+  var headers = SHEET_HEADERS[name];
+  if (!headers) throw new Error('unknown sheet tab: ' + name);
+  sh = ss.insertSheet(name);
+  sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+  // نص عادي لكل الأعمدة — Sheets بيحوّل قيم متل "1/3" أو "2026-07-25" لتاريخ تلقائياً بدون هيك
+  sh.getRange(2, 1, 2000, headers.length).setNumberFormat('@');
   return sh;
 }
 

@@ -3,3 +3,6 @@
 node_modules/
 tabsense-sync/config.json
 tabsense-sync/downloads/
+
+# ربط clasp المحلي (خاص بجهاز واحد — فيه معرّف السكربت)
+apps-script/.clasp.json
