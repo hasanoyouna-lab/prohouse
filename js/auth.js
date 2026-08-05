@@ -41,6 +41,21 @@ const Auth = (() => {
     return json.data.employee;
   }
 
+  // مو عبر طابور المزامنة عن قصد: لازم نعرف النتيجة فوراً، وإعادة المحاولة تلقائياً برقم
+  // سري غلط ما إلها معنى. وبما إن السيرفر بيلغي كل الجلسات بعد التغيير، لازم دخول جديد.
+  async function changePin(currentPin, newPin) {
+    if (!API_URL) throw new Error("الباك اند مو مربوط");
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "changePin", token: getToken(), payload: { currentPin, newPin } })
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || "فشل تغيير الرقم");
+    clearSession();
+    return true;
+  }
+
   async function logout() {
     const token = getToken();
     clearSession();
@@ -82,7 +97,7 @@ const Auth = (() => {
   function canManageSettings() { return role() === "owner"; }
 
   return {
-    getToken, getEmployee, isLoggedIn, login, logout, verify, clearSessionAndReload,
+    getToken, getEmployee, isLoggedIn, login, logout, changePin, verify, clearSessionAndReload,
     role, branches, isOwner, canSeeAllBranches, canEditBranch,
     isViewOnlyEntry, isViewOnlyTomorrow, canSeeReports, canManageItems, canManageSettings
   };

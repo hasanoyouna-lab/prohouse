@@ -53,17 +53,22 @@ var DEFAULT_BRANCHES = 'الروضة,الشاطئ,عبداللطيف جميل';
 var DEFAULT_CATEGORY_ORDER = 'دجاج,لحم,بحري,كارب,السلطات,الحلويات,فطور,معدات';
 var SESSION_DAYS = 30;
 
-// أرقام سرية افتراضية سهلة — كل موظف لازم يعرفها ويقدر يغيّرها لاحقاً من داخل الموقع.
-// هاد التعيين بيصير مرة وحدة بس وقت الإعداد؛ أي تعديل يدوي بالشيت بعدها ما بينلمس.
+// الأدوار والفروع الأولية لكل موظف. **ما فيه أرقام سرية هون عن قصد** — هاد الملف منشور
+// بريبو عام، وأي رقم بينكتب فيه بيصير مقروء للكل وبيضل بتاريخ git للأبد حتى لو انمسح بعدين.
+// الأرقام بتتولّد عشوائياً وقت الإعداد وبتنطبع بسجل التنفيذ (View > Executions) للي بيشغّل الدالة بس.
 var EMPLOYEE_ROSTER = {
-  'أ.يزيد': { role: 'owner', branches: '', pin: '7284' },
-  'حسن': { role: 'owner', branches: '', pin: '5931' },
-  'الشيف عصام': { role: 'chef', branches: '', pin: '4062' },
-  'أبو يونس': { role: 'manager', branches: 'الروضة,الشاطئ', pin: '8317' },
-  'العامودي': { role: 'manager', branches: 'الشاطئ', pin: '2649' },
-  'عبدالهادي': { role: 'manager', branches: 'عبداللطيف جميل', pin: '6503' },
-  'غالب': { role: 'employee', branches: 'عبداللطيف جميل', pin: '9174' }
+  'أ.يزيد': { role: 'owner', branches: '' },
+  'حسن': { role: 'owner', branches: '' },
+  'الشيف عصام': { role: 'chef', branches: '' },
+  'أبو يونس': { role: 'manager', branches: 'الروضة,الشاطئ' },
+  'العامودي': { role: 'manager', branches: 'الشاطئ' },
+  'عبدالهادي': { role: 'manager', branches: 'عبداللطيف جميل' },
+  'غالب': { role: 'employee', branches: 'عبداللطيف جميل' }
 };
+
+function randomPin_() {
+  return String(Math.floor(1000 + Math.random() * 9000));
+}
 
 /**
  * شغّل هاي الدالة مرة وحدة بس (▶ Run فوق، اختارها من القائمة، وافق على الصلاحيات).
@@ -115,7 +120,7 @@ function migrateEmployees_() {
   var pinCol = r.headers.indexOf('pin') + 1;
   var roleCol = r.headers.indexOf('role') + 1;
   var branchesCol = r.headers.indexOf('branches') + 1;
-  var seq = 9001;
+  var issued = [];
   r.rows.forEach(function (row, i) {
     var rowNum = i + 2;
     var name = String(row.name || '').trim();
@@ -124,10 +129,32 @@ function migrateEmployees_() {
     if (!row.role) r.sh.getRange(rowNum, roleCol).setValue(roster ? roster.role : 'employee');
     if (!row.branches && roster) r.sh.getRange(rowNum, branchesCol).setValue(roster.branches);
     if (!row.pin) {
-      var pin = roster ? roster.pin : String(seq++);
+      var pin = randomPin_();
       r.sh.getRange(rowNum, pinCol).setValue(hashPin_(pin));
+      issued.push(name + ': ' + pin);
     }
   });
+  // الأرقام بتظهر بسجل التنفيذ بس (View > Executions) — ما بتنكتب بأي ملف ولا بالشيت
+  if (issued.length) Logger.log('أرقام سرية جديدة (انسخها وسلّمها لأصحابها ثم أغلق السجل):\n' + issued.join('\n'));
+}
+
+/**
+ * تصفير الرقم السري لموظف معيّن. شغّلها من المحرر بعد ما تعدّل الاسم تحت.
+ * بتطبع الرقم الجديد بسجل التنفيذ — ما بتحطه بأي ملف ولا بترسله لحدا.
+ */
+function resetPinFor() {
+  var employeeName = 'حسن'; // ← بدّل الاسم هون قبل التشغيل
+  var r = readRows(SHEET_NAMES.EMPLOYEES);
+  var pinCol = r.headers.indexOf('pin') + 1;
+  for (var i = 0; i < r.rows.length; i++) {
+    if (String(r.rows[i].name || '').trim() === employeeName) {
+      var pin = randomPin_();
+      r.sh.getRange(i + 2, pinCol).setValue(hashPin_(pin));
+      Logger.log('الرقم السري الجديد لـ ' + employeeName + ': ' + pin);
+      return 'تم — شوف الرقم بسجل التنفيذ (View > Executions)';
+    }
+  }
+  throw new Error('ما لقينا موظف بهذا الاسم: ' + employeeName);
 }
 
 function seedInitialDataIfEmpty() {
@@ -226,7 +253,7 @@ function doGet(e) {
         if (employee.role !== 'owner') throw new Error('غير مصرح');
         data = getEmployees();
         break;
-      case 'getSettings': data = getSettings(); break;
+      case 'getSettings': data = getSettingsForClient_(employee); break;
       case 'getJuices': data = getJuices(e.parameter.all === '1'); break;
       case 'getJuiceDay':
         requireBranchAccess_(employee, e.parameter.branch);
@@ -307,6 +334,9 @@ function doPost(e) {
         requireBranchAccess_(employee, body.payload.branch);
         data = saveJuiceDay(body.payload);
         break;
+      case 'changePin':
+        data = changePin(employee, body.payload);
+        break;
       case 'saveSettings':
         if (employee.role !== 'owner') throw new Error('غير مصرح');
         data = saveSettings(body.payload);
@@ -363,6 +393,32 @@ function login(pin) {
       branches: (row.branches || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean)
     }
   };
+}
+
+// كل موظف بيغيّر رقمه هو بس (بيثبت هويته بالرقم الحالي) — ما فيه دور بيقدر يغيّر رقم غيره
+// من الواجهة. تصفير رقم موظف نسي رقمه بيصير من المحرر بدالة resetPinFor().
+function changePin(employee, p) {
+  var currentPin = String((p && p.currentPin) || '').trim();
+  var newPin = String((p && p.newPin) || '').trim();
+
+  if (!/^\d{4,8}$/.test(newPin)) throw new Error('الرقم الجديد لازم يكون من 4 لـ 8 أرقام');
+  if (currentPin === newPin) throw new Error('الرقم الجديد نفس القديم');
+
+  var r = readRows(SHEET_NAMES.EMPLOYEES);
+  var idx = -1;
+  for (var i = 0; i < r.rows.length; i++) { if (r.rows[i].id === employee.id) { idx = i; break; } }
+  if (idx === -1) throw new Error('ما لقينا حسابك');
+  if (r.rows[idx].pin !== hashPin_(currentPin)) throw new Error('الرقم الحالي غير صحيح');
+
+  // ما حدا تاني بيستخدم نفس الرقم — وإلا اثنين بيدخلوا بنفس الرقم وأول وحدة بتتطابق بتفوز
+  var taken = r.rows.some(function (row, i2) { return i2 !== idx && row.pin === hashPin_(newPin); });
+  if (taken) throw new Error('الرقم مستخدم من موظف تاني — اختر رقم غيره');
+
+  r.sh.getRange(idx + 2, r.headers.indexOf('pin') + 1).setValue(hashPin_(newPin));
+
+  // كل الجلسات القديمة بتنلغى — لو حدا كان داخل برقمك القديم بينطرد
+  deleteRowsWhere(SHEET_NAMES.SESSIONS, function (row) { return row.employeeId === employee.id; });
+  return { ok: true };
 }
 
 function logout(token) {
@@ -835,6 +891,21 @@ function getSettings() {
   var rows = readRows(SHEET_NAMES.SETTINGS).rows;
   var out = {};
   rows.forEach(function (r) { out[r.key] = r.value; });
+  return out;
+}
+
+// إعدادات ما لازم تطلع لأي حدا غير المالك. كل الأدوار بتحتاج getSettings (الفروع، ترتيب
+// التصنيفات، حدود التنبيه) — بس integrationToken بيسمح بالكتابة بدون جلسة موظف، فتسريبه
+// لموظف عادي بيلغي كل نظام الصلاحيات.
+var SECRET_SETTING_KEYS = ['integrationToken'];
+
+function getSettingsForClient_(employee) {
+  var all = getSettings();
+  if (employee && employee.role === 'owner') return all;
+  var out = {};
+  Object.keys(all).forEach(function (k) {
+    if (SECRET_SETTING_KEYS.indexOf(k) === -1) out[k] = all[k];
+  });
   return out;
 }
 

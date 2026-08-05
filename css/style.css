@@ -342,6 +342,19 @@ table.order-table td.total-cell{ font-weight:900; background:#FFF4D6; }
 .dash-trend.up{ color:var(--green); }
 .dash-trend.down{ color:var(--red); }
 
+/* ==================== نافذة تغيير الرقم السري ==================== */
+.pin-dialog{
+  position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center;
+  background:rgba(0,0,0,.55); padding:16px;
+}
+.pin-dialog-card{
+  background:var(--card); border:2.5px solid var(--black); border-radius:var(--radius);
+  padding:18px; width:100%; max-width:340px; box-shadow:var(--shadow-lg);
+}
+.pin-dialog-card h3{ margin:0 0 14px; font-size:15px; font-weight:900; }
+.pin-dialog-card input{ letter-spacing:3px; text-align:center; }
+.pin-note{ font-size:11.5px; color:var(--gray); font-weight:600; margin-top:10px; }
+
 /* ==================== جرد العصيرات ==================== */
 .juice-card .badges{ margin-top:6px; }
 

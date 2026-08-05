@@ -34,7 +34,32 @@
   <div class="user-bar hidden" id="userBar">
     <span id="userBarName"></span>
     <span class="badge neutral" id="userBarRole"></span>
+    <button class="logout-btn" id="changePinBtn">🔑 غيّر رقمي</button>
     <button class="logout-btn" id="logoutBtn">خروج</button>
+  </div>
+
+  <div class="pin-dialog hidden" id="pinDialog">
+    <div class="pin-dialog-card">
+      <h3>تغيير الرقم السري</h3>
+      <div class="field">
+        <label>رقمك الحالي</label>
+        <input type="password" inputmode="numeric" id="pinCurrent" autocomplete="off" maxlength="8">
+      </div>
+      <div class="field">
+        <label>الرقم الجديد (من ٤ لـ ٨ أرقام)</label>
+        <input type="password" inputmode="numeric" id="pinNew" autocomplete="off" maxlength="8">
+      </div>
+      <div class="field">
+        <label>أعد كتابة الرقم الجديد</label>
+        <input type="password" inputmode="numeric" id="pinConfirm" autocomplete="off" maxlength="8">
+      </div>
+      <div class="login-error hidden" id="pinError"></div>
+      <div class="toolbar" style="margin-bottom:0;">
+        <button class="btn gold" id="pinSaveBtn">حفظ</button>
+        <button class="btn" id="pinCancelBtn">إلغاء</button>
+      </div>
+      <div class="pin-note">بعد الحفظ رح تحتاج تسجّل دخول بالرقم الجديد.</div>
+    </div>
   </div>
 
   <div class="tabs">
@@ -137,8 +162,9 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<!-- ExcelJS و Chart.js ما بينحمّلوا مع الإقلاع — بينجلبوا بس أول ما تُفتح شاشة التقارير
+     (شوف loadReportLibs بـ js/report.js). حجمهم مع بعض أكبر من التطبيق كله، وأغلب الموظفين
+     ما بيفتحوا التقارير أصلاً؛ تحميلهم بالبداية كان بيبطّئ الفتح على جوالات النت الضعيف. -->
 <script src="js/config.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/sync.js"></script>

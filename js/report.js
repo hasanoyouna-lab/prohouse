@@ -12,6 +12,26 @@ function monthRange(monthStr) {
   return { start, end };
 }
 
+// ---- تحميل مكتبات التقارير عند الطلب ----
+// بتنجلب مرة وحدة بس أول ما تُفتح شاشة التقارير. لو ما في نت، بتفشل بهدوء — الجداول
+// بتضل تشتغل، وبس الرسم البياني والتصدير بيتعطلوا (الكود اللي بيستخدمهم بيفحص وجودهم أصلاً).
+let reportLibsPromise = null;
+function loadReportLibs() {
+  if (reportLibsPromise) return reportLibsPromise;
+  const load = (src) => new Promise((resolve) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.head.appendChild(s);
+  });
+  reportLibsPromise = Promise.all([
+    load("https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"),
+    load("https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js")
+  ]);
+  return reportLibsPromise;
+}
+
 function initReportTab() {
   document.getElementById("reportType").addEventListener("change", (e) => {
     const isTomorrow = e.target.value === "tomorrow";
@@ -314,7 +334,15 @@ async function renderMealsSummary(days) {
 }
 
 let trendChartInstance = null;
+let lastTrendDays = null; // نحتفظ بآخر بيانات اترسمت حتى نقدر نعيد الرسم لما توصل مكتبة Chart
+
+// تُنادى بعد ما تخلص مكتبة Chart تحميل — بترسم الرسم البياني للتقرير المعروض أصلاً
+function redrawTrendChartIfReady() {
+  if (lastTrendDays && typeof Chart !== "undefined" && !trendChartInstance) renderTrendChart(lastTrendDays);
+}
+
 function renderTrendChart(days) {
+  lastTrendDays = days;
   const canvas = document.getElementById("reportTrendChart");
   if (!canvas || typeof Chart === "undefined") return;
 
@@ -388,8 +416,9 @@ async function exportExcel() {
     showToast("مافي بيانات للتصدير بهذه الفترة/الفلترة");
     return;
   }
+  await loadReportLibs();
   if (typeof ExcelJS === "undefined") {
-    showToast("مكتبة Excel لسا ما تحمّلت، جرب مرة ثانية");
+    showToast("مكتبة Excel ما تحمّلت — تأكد من الاتصال بالنت");
     return;
   }
 
@@ -510,7 +539,8 @@ function renderTomorrowReport(rows, branches, date) {
 
 async function exportTomorrowReportExcel() {
   if (!lastTomorrowReportRows.length) { showToast("مافي بيانات للتصدير"); return; }
-  if (typeof ExcelJS === "undefined") { showToast("مكتبة Excel لسا ما تحمّلت، جرب مرة ثانية"); return; }
+  await loadReportLibs();
+  if (typeof ExcelJS === "undefined") { showToast("مكتبة Excel ما تحمّلت — تأكد من الاتصال بالنت"); return; }
 
   const branches = lastTomorrowReportBranches;
   const showTotal = branches.length > 1;

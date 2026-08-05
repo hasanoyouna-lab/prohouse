@@ -37,6 +37,13 @@ function setActiveTab(tab) {
   document.getElementById("saveBarJuices").classList.toggle("hidden", tab !== "juices" || Auth.isViewOnlyEntry());
 
   if (tab === "dashboard") { renderDashboard(); }
+  // مكتبات الرسم البياني والتصدير بتنجلب أول ما تُفتح التقارير، وبعد ما توصل بنعيد الرسم
+  // حتى الرسم البياني يظهر لو كان التقرير انعرض قبل ما تخلص المكتبة تحميل.
+  if (tab === "report") {
+    loadReportLibs().then(() => {
+      if (!document.getElementById("reportContainer").classList.contains("hidden")) redrawTrendChartIfReady();
+    });
+  }
   // الفرع ممكن يكون تغيّر من شاشة تانية (كرت الفرع بالرئيسية) — نعيد التحميل بس وقتها
   if (tab === "juices" && currentJuiceBranch !== Branch.get()) { loadJuiceDay(currentJuiceDate); }
   if (tab === "items") { Items.load().then(renderItemsAdminView); }
@@ -144,6 +151,42 @@ async function doLoginSubmit() {
 }
 document.getElementById("loginSubmitBtn").addEventListener("click", doLoginSubmit);
 document.getElementById("loginPinInput").addEventListener("keydown", (e) => { if (e.key === "Enter") doLoginSubmit(); });
+
+// ---- تغيير الرقم السري ----
+function togglePinDialog(show) {
+  document.getElementById("pinDialog").classList.toggle("hidden", !show);
+  document.getElementById("pinError").classList.add("hidden");
+  if (show) {
+    ["pinCurrent", "pinNew", "pinConfirm"].forEach(id => { document.getElementById(id).value = ""; });
+    document.getElementById("pinCurrent").focus();
+  }
+}
+document.getElementById("changePinBtn").addEventListener("click", () => togglePinDialog(true));
+document.getElementById("pinCancelBtn").addEventListener("click", () => togglePinDialog(false));
+
+document.getElementById("pinSaveBtn").addEventListener("click", async () => {
+  const currentPin = document.getElementById("pinCurrent").value.trim();
+  const newPin = document.getElementById("pinNew").value.trim();
+  const confirmPin = document.getElementById("pinConfirm").value.trim();
+  const errEl = document.getElementById("pinError");
+  const showErr = (msg) => { errEl.textContent = msg; errEl.classList.remove("hidden"); };
+
+  if (!currentPin || !newPin) return showErr("عبّي كل الخانات");
+  if (newPin !== confirmPin) return showErr("الرقم الجديد ما تطابق بالخانتين");
+  if (!/^\d{4,8}$/.test(newPin)) return showErr("الرقم الجديد لازم يكون من ٤ لـ ٨ أرقام");
+
+  const btn = document.getElementById("pinSaveBtn");
+  btn.disabled = true;
+  try {
+    await Auth.changePin(currentPin, newPin);
+    alert("تم تغيير رقمك. سجّل دخول بالرقم الجديد.");
+    location.reload(); // الجلسات القديمة انلغت عالسيرفر — لازم دخول جديد
+  } catch (e) {
+    showErr(String(e).replace(/^(Error:\s*)+/, ""));
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 document.getElementById("logoutBtn").addEventListener("click", async () => {
   if (!confirm("تسجيل الخروج؟")) return;
