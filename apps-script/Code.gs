@@ -1075,7 +1075,7 @@ function sendWhatsAppMessage_(phone, text) {
 
 function checkAndSendReturnAlert_(p) {
   var settings = getSettings();
-  var adminPhone = settings.adminPhone || settings.whatsappPhone;
+  var adminPhone = settings.adminPhone || settings.whatsappPhone || '966540024717';
   if (!adminPhone) return;
 
   var returnThreshold = settings.returnThresholdPct !== undefined && settings.returnThresholdPct !== ''
@@ -1114,7 +1114,7 @@ function checkAndSendReturnAlert_(p) {
 
 function sendTomorrowOrderNotification_(p) {
   var settings = getSettings();
-  var targetPhone = settings.chefPhone || settings.adminPhone || settings.whatsappPhone;
+  var targetPhone = settings.chefPhone || settings.adminPhone || settings.whatsappPhone || '966540024717';
   if (!targetPhone || !p.items || !p.items.length) return;
 
   var msg = '📦 *طلبية جديدة للغد — Pro House*\n';
@@ -1131,7 +1131,7 @@ function sendTomorrowOrderNotification_(p) {
 
 function sendDailyWhatsAppSummary() {
   var settings = getSettings();
-  var adminPhone = settings.adminPhone || settings.whatsappPhone;
+  var adminPhone = settings.adminPhone || settings.whatsappPhone || '966540024717';
   if (!adminPhone) return 'لم يحدد رقم واتساب الإدارة بعد.';
 
   var today = nowIso().slice(0, 10);
