@@ -1,4 +1,4 @@
-// ==================== شاشة طلبية الغد (نفس بنية طلبية اليوم بالظبط) ====================
+// ==================== شاشة طلبية الغد (مع دعم الذكاء الاصطناعي والتوقع التلقائي) ====================
 // ملاحظة: هاي الشاشة تعرض كل الأصناف دايماً بغض النظر عن فلترة الفروع (الفلترة تخص شاشة الاستلام بس)
 
 let currentTomorrowDate = addDaysStr(todayStr(), 1);
@@ -6,6 +6,7 @@ let currentTomorrowOrder = {}; // itemId -> {qty, notes}
 let currentTomorrowBranch = "";
 let tomorrowCategoryCollapsed = {};
 let currentTomorrowGroups = [];
+let currentTomorrowRecommendations = {}; // itemId -> {qty, avg, reason}
 
 function isTomorrowItemFilled(id) {
   const e = currentTomorrowOrder[id];
@@ -52,6 +53,25 @@ function renderTomorrowView() {
     return;
   }
 
+  // بطاقة الذكاء الاصطناعي والتوقع التلقائي
+  const recCount = Object.keys(currentTomorrowRecommendations).length;
+  const aiCard = document.createElement("div");
+  aiCard.className = "ai-forecast-card";
+  aiCard.innerHTML = `
+    <div class="top-line">
+      <div class="ai-forecast-title">🤖 اقتراحات الذكاء الاصطناعي ${recCount > 0 ? `(${recCount} صنف)` : ""}</div>
+      ${!Auth.isViewOnlyTomorrow() && recCount > 0 ? `<button class="btn gold" id="applyAllAiBtn" style="padding:6px 12px;font-size:12px;">✨ ملء كل المقترحات</button>` : ""}
+    </div>
+    <div style="font-size:11.5px;color:var(--gray);font-weight:600;">
+      ${recCount > 0 ? "يتم احتساب الكميات المقترحة بناءً على متوسط استهلاك نفس اليوم بالأسابيع السابقة + 10% أمان." : "جاري تحليل السجل التاريخي أو لا تتوفر مبيعات سابقة كافية بهذا الفرع."}
+    </div>
+  `;
+  view.appendChild(aiCard);
+
+  if (document.getElementById("applyAllAiBtn")) {
+    document.getElementById("applyAllAiBtn").addEventListener("click", applyAllAiRecommendations);
+  }
+
   const progressWrap = document.createElement("div");
   progressWrap.className = "progress-bar-wrap";
   progressWrap.id = "tomorrowProgressWrap";
@@ -93,11 +113,19 @@ function renderTomorrowView() {
 
     group.items.forEach(item => {
       const entry = currentTomorrowOrder[item.id] || { qty: "", notes: "" };
+      const rec = currentTomorrowRecommendations[item.id];
+      const recPillHtml = rec
+        ? `<div class="ai-recommendation-pill" data-id="${item.id}" data-qty="${rec.qty}" title="${rec.reason}">
+            🤖 المقترح: <strong>${rec.qty}</strong> <span class="ai-hint">(${rec.reason})</span>
+           </div>`
+        : "";
+
       const card = document.createElement("div");
       card.className = "item-card";
       card.id = "tomcard-" + item.id;
       card.innerHTML = `
         <div class="item-name">${item.name} <span class="item-unit">(${item.unit})</span></div>
+        ${recPillHtml}
         <div class="inputs-row">
           <div class="field">
             <label>الكمية المطلوبة</label>
@@ -118,11 +146,44 @@ function renderTomorrowView() {
     view.querySelectorAll("input[data-field]").forEach(inp => {
       inp.addEventListener("input", onTomorrowFieldChange);
     });
+
+    view.querySelectorAll(".ai-recommendation-pill").forEach(pill => {
+      pill.addEventListener("click", (e) => {
+        const targetPill = e.currentTarget;
+        const itemId = targetPill.dataset.id;
+        const qty = targetPill.dataset.qty;
+        const inp = view.querySelector(`input[data-id="${itemId}"][data-field="qty"]`);
+        if (inp) {
+          inp.value = qty;
+          inp.dispatchEvent(new Event("input", { bubbles: true }));
+          showToast(`تم تعبئة الكمية المقترحة (${qty})`);
+        }
+      });
+    });
   }
 
   currentTomorrowGroups = groups;
   updateTomorrowCategoryCounts(groups);
   updateTomorrowProgressBar();
+}
+
+function applyAllAiRecommendations() {
+  if (Auth.isViewOnlyTomorrow()) return;
+  let appliedCount = 0;
+  Items.current.forEach(item => {
+    const rec = currentTomorrowRecommendations[item.id];
+    if (rec && rec.qty) {
+      if (!currentTomorrowOrder[item.id]) currentTomorrowOrder[item.id] = { qty: "", notes: "" };
+      currentTomorrowOrder[item.id].qty = String(rec.qty);
+      const inp = document.querySelector(`input[data-id="${item.id}"][data-field="qty"]`);
+      if (inp) inp.value = String(rec.qty);
+      appliedCount++;
+    }
+  });
+  updateTomorrowProgressBar();
+  if (currentTomorrowGroups.length) updateTomorrowCategoryCounts(currentTomorrowGroups);
+  scheduleTomorrowAutoSave();
+  showToast(`✨ تم تطبيق المقترحات الذكية لـ ${appliedCount} صنف!`);
 }
 
 function updateTomorrowCategoryCounts(groups) {
@@ -174,12 +235,20 @@ async function loadTomorrowOrder(dateStr) {
     return;
   }
 
-  document.getElementById("tomorrowView").innerHTML = '<div class="loader">جاري التحميل…</div>';
+  document.getElementById("tomorrowView").innerHTML = '<div class="loader">جاري التحميل وتحليل الذكاء الاصطناعي…</div>';
   currentTomorrowOrder = {};
 
   const cacheKey = "tomorrow:" + dateStr + ":" + currentTomorrowBranch;
   const data = await Sync.get("getTomorrowOrder", { date: dateStr, branch: currentTomorrowBranch }, cacheKey, applyTomorrowData);
   applyTomorrowData(data);
+
+  // جلب توصيات التوقع الذكي
+  try {
+    currentTomorrowRecommendations = await ForecastEngine.getRecommendations(dateStr, currentTomorrowBranch);
+  } catch (err) {
+    console.warn("تعذر جلب التوصيات الذكية:", err);
+    currentTomorrowRecommendations = {};
+  }
 
   renderTomorrowView();
   const hasData = Object.keys(currentTomorrowOrder).length > 0;
