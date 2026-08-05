@@ -268,6 +268,19 @@ async function run() {
     }
 
     console.log(`🎉 تم سحب وإرسال بيانات ${iso} لفرع ${config.branch} بنجاح!`, mappedRows);
+
+    // ---- 5) إشعارات الواتساب السحابية من GitHub Actions ----
+    if ((config.whatsappPhone || config.adminPhone) && (config.whatsappApiKey || config.whatsappToken)) {
+      const targetPhone = config.whatsappPhone || config.adminPhone;
+      const key = config.whatsappApiKey || config.whatsappToken;
+      const waText = encodeURIComponent(`📊 *تحديث سحابي أوتوماتيكي — Pro House*\n🏢 الفرع: ${config.branch}\n📅 التاريخ: ${iso}\n\n🎉 تم سحب وإرسال أحدث بيانات تابسنس بنجاح لفرع ${config.branch}.`);
+      try {
+        await fetch(`https://api.callmebot.com/whatsapp.php?phone=${targetPhone}&text=${waText}&apikey=${key}`);
+        console.log("📲 تم إرسال إشعار الواتساب السحابي بنجاح!");
+      } catch (waErr) {
+        console.warn("⚠ تعذر إرسال إشعار الواتساب السحابي:", waErr.message);
+      }
+    }
   } catch (err) {
     console.error("❌ فشل السحب:", err.message);
     await page.screenshot({ path: path.join(DOWNLOAD_DIR, "error-screenshot.png") }).catch(() => {});
