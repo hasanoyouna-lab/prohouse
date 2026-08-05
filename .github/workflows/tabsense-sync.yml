@@ -1,0 +1,47 @@
+name: TabSense 30-Min Sync
+
+on:
+  schedule:
+    # Runs automatically every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch: # Enables manual trigger button on GitHub
+
+jobs:
+  tabsense-sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        working-directory: ./tabsense-sync
+        run: |
+          npm ci || npm install
+
+      - name: Install Playwright Browsers
+        working-directory: ./tabsense-sync
+        run: |
+          npx playwright install --with-deps chromium
+
+      - name: Create config.json from GitHub Secret
+        working-directory: ./tabsense-sync
+        env:
+          TABSENSE_CONFIG: ${{ secrets.TABSENSE_CONFIG_JSON }}
+        run: |
+          if [ -n "$TABSENSE_CONFIG" ]; then
+            echo "$TABSENSE_CONFIG" > config.json
+          else
+            echo "Error: TABSENSE_CONFIG_JSON secret is not set!"
+            exit 1
+          fi
+
+      - name: Run TabSense Sync Script
+        working-directory: ./tabsense-sync
+        run: |
+          node pull-tabsense.js
