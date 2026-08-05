@@ -100,6 +100,27 @@ function renderSettingsView() {
     </div>
 
     <div class="settings-card">
+      <h3>إشعارات وتنبيهات الواتساب 💬📱</h3>
+      <div class="field">
+        <label>رقم واتساب الإدارة (مع رمز الدولة بدون + مثل: 966500000000)</label>
+        <input type="tel" id="setAdminPhone" value="${currentSettings.adminPhone || currentSettings.whatsappPhone || ""}" placeholder="966500000000">
+      </div>
+      <div class="field">
+        <label>رابط بوابة الواتساب / API URL (اختياري - يترك فارغاً للوضع المجاني CallMeBot)</label>
+        <input type="url" id="setWhatsappApiUrl" value="${currentSettings.whatsappApiUrl || ""}" placeholder="https://api.green-api.com">
+      </div>
+      <div class="field">
+        <label>مفتاح API / Token / Instance ID (اختياري)</label>
+        <input type="text" id="setWhatsappToken" value="${currentSettings.whatsappToken || ""}" placeholder="رمز API">
+      </div>
+      <div class="toolbar" style="margin-top:10px;">
+        <button class="btn gold" id="saveWhatsappBtn">حفظ إعدادات الواتساب</button>
+        <button class="btn primary" id="testWhatsappBtn">🧪 تجربة إرسال رسالة</button>
+        <button class="btn" id="enableDailySummaryBtn">⏰ تفعيل التقرير اليومي (11 م)</button>
+      </div>
+    </div>
+
+    <div class="settings-card">
       <h3>إدارة الأصناف</h3>
       <button class="btn primary" id="gotoItemsBtn">فتح شاشة إدارة الأصناف</button>
     </div>
@@ -158,6 +179,51 @@ function renderSettingsView() {
     Sync.enqueue("saveSettings:thresholds", "saveSettings", payload);
     showToast("تم حفظ الأعتاب");
   });
+
+  const saveWaBtn = document.getElementById("saveWhatsappBtn");
+  if (saveWaBtn) {
+    saveWaBtn.addEventListener("click", () => {
+      const adminPhone = document.getElementById("setAdminPhone").value.trim();
+      const whatsappApiUrl = document.getElementById("setWhatsappApiUrl").value.trim();
+      const whatsappToken = document.getElementById("setWhatsappToken").value.trim();
+      const payload = { adminPhone, whatsappPhone: adminPhone, whatsappApiUrl, whatsappToken };
+      currentSettings = { ...currentSettings, ...payload };
+      Sync.cacheSet("settings", currentSettings);
+      Sync.enqueue("saveSettings:whatsapp", "saveSettings", payload);
+      showToast("تم حفظ إعدادات الواتساب");
+    });
+  }
+
+  const testWaBtn = document.getElementById("testWhatsappBtn");
+  if (testWaBtn) {
+    testWaBtn.addEventListener("click", async () => {
+      const adminPhone = document.getElementById("setAdminPhone").value.trim();
+      if (!adminPhone) {
+        showToast("ادخل رقم واتساب الإدارة أولاً");
+        return;
+      }
+      showToast("جاري إرسال الرسالة التجريبية...");
+      try {
+        const res = await Sync.call("testWhatsApp", { phone: adminPhone, message: "🚀 رسالة تجريبية من Pro House! تم تفعيل نظام التنبيهات بنجاح." });
+        if (res && res.ok) showToast("🎉 تم إرسال رسالة الواتساب بنجاح!");
+        else showToast("تم الإرسال — تحقق من وصول الرسالة على واتساب");
+      } catch (err) {
+        showToast("تعذر إرسال الرسالة — تأكد من صحة رقم الرقم والتوكن");
+      }
+    });
+  }
+
+  const enableSummaryBtn = document.getElementById("enableDailySummaryBtn");
+  if (enableSummaryBtn) {
+    enableSummaryBtn.addEventListener("click", async () => {
+      try {
+        const res = await Sync.call("createDailySummaryTrigger", {});
+        showToast("✅ تم تفعيل التقرير اليومي التلقائي الساعة 11 مساءً");
+      } catch (err) {
+        showToast("تعذر تفعيل المشغّل المجدول");
+      }
+    });
+  }
 
   document.getElementById("gotoItemsBtn").addEventListener("click", () => {
     document.querySelector('.tab-btn[data-tab="items"]').click();

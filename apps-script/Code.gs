@@ -341,6 +341,14 @@ function doPost(e) {
         if (employee.role !== 'owner') throw new Error('غير مصرح');
         data = saveSettings(body.payload);
         break;
+      case 'testWhatsApp':
+        if (employee.role !== 'owner') throw new Error('غير مصرح');
+        data = sendWhatsAppMessage_(body.payload.phone, body.payload.message || 'اختبار إشعارات الواتساب من Pro House 🚀');
+        break;
+      case 'createDailySummaryTrigger':
+        if (employee.role !== 'owner') throw new Error('غير مصرح');
+        data = createDailySummaryTrigger();
+        break;
       case 'restoreAll':
         if (employee.role !== 'owner') throw new Error('غير مصرح');
         data = restoreAll(body.payload);
@@ -1011,3 +1019,143 @@ function restoreAll(p) {
   replaceSheet(SHEET_NAMES.SETTINGS, p.settings);
   return { restoredAt: nowIso() };
 }
+
+// ==================== إشعارات وتنبيهات الواتساب التلقائية ====================
+
+function sendWhatsAppMessage_(phone, text) {
+  if (!phone || !text) return false;
+  var settings = getSettings();
+  var apiUrl = settings.whatsappApiUrl || '';
+  var instanceId = settings.whatsappInstanceId || '';
+  var token = settings.whatsappToken || '';
+
+  var cleanPhone = String(phone).replace(/[\s\+\-]/g, '');
+  if (!cleanPhone) return false;
+
+  try {
+    if (apiUrl && apiUrl.indexOf('green-api') !== -1) {
+      var url = apiUrl.replace(/\/$/, '') + '/waInstance' + instanceId + '/sendMessage/' + token;
+      var payload = { chatId: cleanPhone + '@c.us', message: text };
+      UrlFetchApp.fetch(url, {
+        method: 'post',
+        contentType: 'application/json',
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true
+      });
+    } else if (apiUrl) {
+      var payload2 = { to: cleanPhone, message: text, body: text, token: token };
+      UrlFetchApp.fetch(apiUrl, {
+        method: 'post',
+        contentType: 'application/json',
+        payload: JSON.stringify(payload2),
+        muteHttpExceptions: true
+      });
+    } else {
+      // CallMeBot Free WhatsApp API Fallback
+      var callMeBotUrl = 'https://api.callmebot.com/whatsapp.php?phone=' + cleanPhone + '&text=' + encodeURIComponent(text) + (token ? '&apikey=' + token : '');
+      UrlFetchApp.fetch(callMeBotUrl, { method: 'get', muteHttpExceptions: true });
+    }
+    return true;
+  } catch (e) {
+    Logger.log('Error sending WhatsApp message: ' + e.toString());
+    return false;
+  }
+}
+
+function checkAndSendReturnAlert_(p) {
+  var settings = getSettings();
+  var adminPhone = settings.adminPhone || settings.whatsappPhone;
+  if (!adminPhone) return;
+
+  var returnThreshold = settings.returnThresholdPct !== undefined && settings.returnThresholdPct !== ''
+    ? Number(settings.returnThresholdPct) : 0.15; // 15% default
+
+  var flaggedItems = [];
+  (p.items || []).forEach(function (it) {
+    var rec = Number(it.received) || 0;
+    var ret = Number(it.returned) || 0;
+    if (rec > 0) {
+      var pct = ret / rec;
+      if (pct >= returnThreshold) {
+        flaggedItems.push({
+          name: it.itemName,
+          rec: rec,
+          ret: ret,
+          pct: Math.round(pct * 100)
+        });
+      }
+    }
+  });
+
+  if (flaggedItems.length === 0) return;
+
+  var msg = '🚨 *تنبيه إرجاع مرتفع — Pro House*\n';
+  msg += '🏢 الفرع: ' + (p.branch || '') + '\n';
+  msg += '👤 الموظف: ' + (p.employeeName || '') + '\n';
+  msg += '📅 التاريخ: ' + (p.date || '') + '\n\n';
+  msg += '⚠️ الأصناف ذات الإرجاع المرتفع:\n';
+  flaggedItems.forEach(function (it) {
+    msg += '• ' + it.name + ': استلام ' + it.rec + ' | إرجاع ' + it.ret + ' (نسبة ' + it.pct + '%)\n';
+  });
+
+  sendWhatsAppMessage_(adminPhone, msg);
+}
+
+function sendTomorrowOrderNotification_(p) {
+  var settings = getSettings();
+  var adminPhone = settings.adminPhone || settings.whatsappPhone;
+  if (!adminPhone || !p.items || !p.items.length) return;
+
+  var msg = '📦 *طلبية جديدة للغد — Pro House*\n';
+  msg += '🏢 الفرع: ' + (p.branch || '') + '\n';
+  msg += '👤 الموظف: ' + (p.employeeName || '') + '\n';
+  msg += '📅 تاريخ الطلبية: ' + (p.date || '') + '\n\n';
+  msg += '📋 الأصناف المطلوبة:\n';
+  p.items.forEach(function (it) {
+    msg += '• ' + it.itemName + ': ' + it.qty + ' ' + (it.unit || '') + (it.notes ? ' (' + it.notes + ')' : '') + '\n';
+  });
+
+  sendWhatsAppMessage_(adminPhone, msg);
+}
+
+function sendDailyWhatsAppSummary() {
+  var settings = getSettings();
+  var adminPhone = settings.adminPhone || settings.whatsappPhone;
+  if (!adminPhone) return 'لم يحدد رقم واتساب الإدارة بعد.';
+
+  var today = nowIso().slice(0, 10);
+  var reportData = getReport(today, today);
+
+  var msg = '📊 *التقرير اليومي لجميع الفروع — Pro House*\n';
+  msg += '📅 التاريخ: ' + today + '\n\n';
+
+  if (!reportData.days || !reportData.days.length) {
+    msg += 'لا يوجد استلامات مسجلة لهذا اليوم بعد.';
+  } else {
+    reportData.days.forEach(function (d) {
+      var totalRec = 0, totalRet = 0;
+      (d.items || []).forEach(function (it) {
+        totalRec += (Number(it.received) || 0);
+        totalRet += (Number(it.returned) || 0);
+      });
+      var pct = totalRec > 0 ? Math.round((totalRet / totalRec) * 100) : 0;
+      msg += '🏢 *فرع ' + d.branch + '*:\n';
+      msg += '  • إجمالي المستلم: ' + totalRec + '\n';
+      msg += '  • إجمالي المرتجع: ' + totalRet + ' (' + pct + '%)\n';
+      msg += '  • الموظف المسؤول: ' + (d.meta ? d.meta.employeeName : '') + '\n\n';
+    });
+  }
+
+  sendWhatsAppMessage_(adminPhone, msg);
+  return 'تم إرسال الملخص اليومي بنجاح.';
+}
+
+function createDailySummaryTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'sendDailyWhatsAppSummary') return 'مشغّل التقرير اليومي للواتساب تفعّل أصلاً.';
+  }
+  ScriptApp.newTrigger('sendDailyWhatsAppSummary').timeBased().everyDays(1).atHour(23).create();
+  return 'تم تفعيل مشغّل تقرير الواتساب اليومي (الساعة 11:00 مساءً).';
+}
+
