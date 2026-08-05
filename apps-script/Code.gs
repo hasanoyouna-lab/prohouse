@@ -1024,6 +1024,17 @@ function restoreAll(p) {
 
 function sendWhatsAppMessage_(phone, text) {
   if (!phone || !text) return false;
+
+  // دعم الأرقام المتعددة المفصولة بفاصلة (مثلاً: رقم صاحب المطعم, رقم الشيف)
+  if (String(phone).indexOf(',') !== -1) {
+    var phones = String(phone).split(',');
+    for (var i = 0; i < phones.length; i++) {
+      var singlePhone = phones[i].trim();
+      if (singlePhone) sendWhatsAppMessage_(singlePhone, text);
+    }
+    return true;
+  }
+
   var settings = getSettings();
   var apiUrl = settings.whatsappApiUrl || '';
   var instanceId = settings.whatsappInstanceId || '';
@@ -1035,7 +1046,7 @@ function sendWhatsAppMessage_(phone, text) {
   try {
     if (apiUrl && apiUrl.indexOf('green-api') !== -1) {
       var url = apiUrl.replace(/\/$/, '') + '/waInstance' + instanceId + '/sendMessage/' + token;
-      var payload = { chatId: cleanPhone + '@c.us', message: text };
+      var payload = { chatId: (cleanPhone.indexOf('@') !== -1 ? cleanPhone : cleanPhone + '@c.us'), message: text };
       UrlFetchApp.fetch(url, {
         method: 'post',
         contentType: 'application/json',
@@ -1103,8 +1114,8 @@ function checkAndSendReturnAlert_(p) {
 
 function sendTomorrowOrderNotification_(p) {
   var settings = getSettings();
-  var adminPhone = settings.adminPhone || settings.whatsappPhone;
-  if (!adminPhone || !p.items || !p.items.length) return;
+  var targetPhone = settings.chefPhone || settings.adminPhone || settings.whatsappPhone;
+  if (!targetPhone || !p.items || !p.items.length) return;
 
   var msg = '📦 *طلبية جديدة للغد — Pro House*\n';
   msg += '🏢 الفرع: ' + (p.branch || '') + '\n';
@@ -1115,7 +1126,7 @@ function sendTomorrowOrderNotification_(p) {
     msg += '• ' + it.itemName + ': ' + it.qty + ' ' + (it.unit || '') + (it.notes ? ' (' + it.notes + ')' : '') + '\n';
   });
 
-  sendWhatsAppMessage_(adminPhone, msg);
+  sendWhatsAppMessage_(targetPhone, msg);
 }
 
 function sendDailyWhatsAppSummary() {

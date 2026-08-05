@@ -102,11 +102,15 @@ function renderSettingsView() {
     <div class="settings-card">
       <h3>إشعارات وتنبيهات الواتساب 💬📱</h3>
       <div class="field">
-        <label>رقم واتساب الإدارة (مع رمز الدولة بدون + مثل: 966500000000)</label>
-        <input type="tel" id="setAdminPhone" value="${currentSettings.adminPhone || currentSettings.whatsappPhone || ""}" placeholder="966500000000">
+        <label>أرقام الإدارة/صاحب المطعم (افصل بين الأرقام بفاصلة , لإرسالها لأكثر من شخص مثل: 966500000000, 966511111111)</label>
+        <input type="tel" id="setAdminPhone" value="${currentSettings.adminPhone || currentSettings.whatsappPhone || ""}" placeholder="966500000000, 966511111111">
       </div>
       <div class="field">
-        <label>رابط بوابة الواتساب / API URL (اختياري - يترك فارغاً للوضع المجاني CallMeBot)</label>
+        <label>رقم واتساب الشيف (لتلقي طلبية الغد تلقائياً)</label>
+        <input type="tel" id="setChefPhone" value="${currentSettings.chefPhone || ""}" placeholder="966522222222">
+      </div>
+      <div class="field">
+        <label>رابط بوابة الواتساب / API URL أو ID القروب (اختياري)</label>
         <input type="url" id="setWhatsappApiUrl" value="${currentSettings.whatsappApiUrl || ""}" placeholder="https://api.green-api.com">
       </div>
       <div class="field">
@@ -184,9 +188,10 @@ function renderSettingsView() {
   if (saveWaBtn) {
     saveWaBtn.addEventListener("click", () => {
       const adminPhone = document.getElementById("setAdminPhone").value.trim();
+      const chefPhone = document.getElementById("setChefPhone").value.trim();
       const whatsappApiUrl = document.getElementById("setWhatsappApiUrl").value.trim();
       const whatsappToken = document.getElementById("setWhatsappToken").value.trim();
-      const payload = { adminPhone, whatsappPhone: adminPhone, whatsappApiUrl, whatsappToken };
+      const payload = { adminPhone, whatsappPhone: adminPhone, chefPhone, whatsappApiUrl, whatsappToken };
       currentSettings = { ...currentSettings, ...payload };
       Sync.cacheSet("settings", currentSettings);
       Sync.enqueue("saveSettings:whatsapp", "saveSettings", payload);
