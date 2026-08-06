@@ -102,8 +102,8 @@ function renderSettingsView() {
     <div class="settings-card">
       <h3>إشعارات وتنبيهات الواتساب 💬📱</h3>
       <div class="field">
-        <label>أرقام الإدارة/صاحب المطعم (افصل بين الأرقام بفاصلة , لإرسالها لأكثر من شخص مثل: 966540024717, 966511111111)</label>
-        <input type="tel" id="setAdminPhone" value="${currentSettings.adminPhone || currentSettings.whatsappPhone || "966540024717"}" placeholder="966540024717">
+        <label>أرقام الإدارة/صاحب المطعم (افصل بين الأرقام بفاصلة لإرسالها لأكثر من شخص)</label>
+        <input type="tel" id="setAdminPhone" value="${currentSettings.adminPhone || currentSettings.whatsappPhone || ""}" placeholder="9665xxxxxxxx">
       </div>
       <div class="field">
         <label>رقم واتساب الشيف (لتلقي طلبية الغد تلقائياً)</label>

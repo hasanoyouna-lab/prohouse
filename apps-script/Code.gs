@@ -1172,7 +1172,9 @@ function sendTomorrowOrderNotification_(p) {
 
 function sendDailyWhatsAppSummary() {
   var settings = getSettings();
-  var adminPhone = settings.adminPhone || settings.whatsappPhone || '966540024717';
+  // بدون رقم افتراضي مكتوب بالكود — رقم ثابت هون معناه إن تقرير المطعم اليومي بينبعت
+  // لرقم غريب لو صارت خانة الإعدادات فاضية لأي سبب.
+  var adminPhone = settings.adminPhone || settings.whatsappPhone || '';
   if (!adminPhone) return 'لم يحدد رقم واتساب الإدارة بعد.';
 
   var today = nowIso().slice(0, 10);

@@ -1,7 +1,7 @@
 // Service Worker: يخزّن هيكل التطبيق (HTML/CSS/JS) محلياً حتى يفتح بدون إنترنت نهائياً.
 // لا يتدخل أبداً بطلبات API_URL (Apps Script) — تلك تمر مباشرة للشبكة ويديرها js/sync.js.
 
-const CACHE_NAME = "prohouse-shell-v17";
+const CACHE_NAME = "prohouse-shell-v18";
 
 // ملفات الكود (HTML/CSS/JS) بتتغيّر مع كل تحديث ننشره — لازم تُطلب من الشبكة أولاً وقت ما يكون
 // في نت، وإلا الموظف بيضل شايف نسخة قديمة لحد ما يعمل Hard Refresh يدوي (هاي كانت مشكلة حقيقية:
