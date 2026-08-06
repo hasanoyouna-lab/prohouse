@@ -50,18 +50,25 @@ const DEFAULT_JUICE_CATEGORIES = ["العصائر", "عصائر", "المشرو�
 // احتياط لو تقرير المنتجات ما فيه عمود تصنيف أصلاً — بنعتمد على الاسم
 const JUICE_NAME_HINTS = ["عصير", "juice"];
 
-function getTargetDateStr() {
-  const customDate = process.argv[2]; // مثال: node pull-tabsense.js 07/30/2026
-  if (customDate && /\d{2}\/\d{2}\/\d{4}/.test(customDate)) {
-    const parts = customDate.split("/");
-    return { display: customDate, iso: `${parts[2]}-${parts[0]}-${parts[1]}` };
-  }
-
-  const d = new Date();
+function formatDateObj(d) {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   const yyyy = d.getFullYear();
   return { display: `${mm}/${dd}/${yyyy}`, iso: `${yyyy}-${mm}-${dd}` };
+}
+
+function getTargetDates() {
+  const customDate = process.argv[2]; // مثال: node pull-tabsense.js 07/30/2026
+  if (customDate && /\d{2}\/\d{2}\/\d{4}/.test(customDate)) {
+    const parts = customDate.split("/");
+    return [{ display: customDate, iso: `${parts[2]}-${parts[0]}-${parts[1]}` }];
+  }
+
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  return [formatDateObj(yesterday), formatDateObj(today)];
 }
 
 function normalizeArabic(s) {
@@ -188,7 +195,7 @@ async function run() {
   const page = await context.newPage();
 
   try {
-    const { display, iso } = getTargetDateStr();
+    const targetDates = getTargetDates();
     console.log(`🔑 جاري تسجيل الدخول بتابسنس...`);
     await page.goto(LOGIN_URL, { waitUntil: "networkidle" });
     await page.fill('input[type="email"], input[name="email"]', config.email);
@@ -198,89 +205,95 @@ async function run() {
       page.click('button[type="submit"], button:has-text("تسجيل الدخول"), button:has-text("Login")')
     ]);
 
-    // ---- 1) تقرير "المبيعات حسب التصنيف" ----
-    console.log(`📊 جاري سحب تقرير المبيعات حسب التصنيف ليوم ${display}...`);
-    await prepareReportPageAndSetDate(page, CATEGORY_REPORT_URL, display);
-    const categoryRows = await extractCategoryTable(page);
-    console.log("جدول التصنيفات المستخرج:", categoryRows);
+    for (const targetDate of targetDates) {
+      const { display, iso } = targetDate;
+      console.log(`\n--------------------------------------------------`);
+      console.log(`📅 معالجة تاريخ: ${display} (${iso})...`);
 
-    const mappedRows = [];
-    categoryRows.forEach(r => {
-      const targetCat = CATEGORY_MAP[r.category];
-      if (targetCat) {
-        const existing = mappedRows.find(m => m.category === targetCat);
-        if (existing) {
-          existing.qty += r.qty;
-        } else {
-          mappedRows.push({ category: targetCat, qty: r.qty });
+      // ---- 1) تقرير "المبيعات حسب التصنيف" ----
+      console.log(`📊 جاري سحب تقرير المبيعات حسب التصنيف ليوم ${display}...`);
+      await prepareReportPageAndSetDate(page, CATEGORY_REPORT_URL, display);
+      const categoryRows = await extractCategoryTable(page);
+      console.log("جدول التصنيفات المستخرج:", categoryRows);
+
+      const mappedRows = [];
+      categoryRows.forEach(r => {
+        const targetCat = CATEGORY_MAP[r.category];
+        if (targetCat) {
+          const existing = mappedRows.find(m => m.category === targetCat);
+          if (existing) {
+            existing.qty += r.qty;
+          } else {
+            mappedRows.push({ category: targetCat, qty: r.qty });
+          }
         }
+      });
+
+      // ---- 2) تقرير "المبيعات حسب المنتج" (منه: أم علي + مبيعات العصيرات) ----
+      console.log("🍩 جاري سحب تقرير المبيعات حسب المنتج...");
+      await prepareReportPageAndSetDate(page, PRODUCT_REPORT_URL, display);
+      const products = await extractProductTable(page);
+      const ummAliQty = findProductQty(products, UMM_ALI_PRODUCT_NAME);
+      console.log(`كمية منتج أم علي المباعة ليوم ${display}: ${ummAliQty}`);
+      
+      const sandwichesFromUmmAli = ummAliQty / 2;
+      if (sandwichesFromUmmAli > 0) {
+        console.log(`تم إضافة ${sandwichesFromUmmAli} ساندويتش من مبيعات أم علي (${ummAliQty} حبة).`);
+        const existing = mappedRows.find(r => r.category === UMM_ALI_TARGET_CATEGORY);
+        if (existing) existing.qty += sandwichesFromUmmAli;
+        else mappedRows.push({ category: UMM_ALI_TARGET_CATEGORY, qty: sandwichesFromUmmAli });
       }
-    });
 
-    // ---- 2) تقرير "المبيعات حسب المنتج" (منه: أم علي + مبيعات العصيرات) ----
-    console.log("🍩 جاري سحب تقرير المبيعات حسب المنتج...");
-    await prepareReportPageAndSetDate(page, PRODUCT_REPORT_URL, display);
-    const products = await extractProductTable(page);
-    const ummAliQty = findProductQty(products, UMM_ALI_PRODUCT_NAME);
-    console.log(`كمية منتج أم علي المباعة ليوم ${display}: ${ummAliQty}`);
-    
-    const sandwichesFromUmmAli = ummAliQty / 2;
-    if (sandwichesFromUmmAli > 0) {
-      console.log(`تم إضافة ${sandwichesFromUmmAli} ساندويتش من مبيعات أم علي (${ummAliQty} حبة).`);
-      const existing = mappedRows.find(r => r.category === UMM_ALI_TARGET_CATEGORY);
-      if (existing) existing.qty += sandwichesFromUmmAli;
-      else mappedRows.push({ category: UMM_ALI_TARGET_CATEGORY, qty: sandwichesFromUmmAli });
-    }
-
-    // ---- 3) إرسال النتيجة لموقع برو هاوس ----
-    console.log(`🚀 جاري إرسال البيانات لموقع Pro House (فرع ${config.branch} - تاريخ ${iso})...`);
-    const res = await fetch(config.prohouseApiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({
-        action: "importSalesByCategory",
-        integrationToken: config.integrationToken,
-        payload: { date: iso, branch: config.branch, rows: mappedRows }
-      })
-    });
-    const json = await res.json();
-    if (!json.ok) throw new Error("رفض السيرفر البيانات: " + json.error);
-
-    // ---- 4) مبيعات العصيرات (لصفحة جرد العصيرات) ----
-    const juiceRows = pickJuiceRows(products, config.juiceCategories || DEFAULT_JUICE_CATEGORIES);
-    if (juiceRows.length) {
-      console.log(`🥤 جاري إرسال مبيعات ${juiceRows.length} عصير...`);
-      const juiceRes = await fetch(config.prohouseApiUrl, {
+      // ---- 3) إرسال النتيجة لموقع برو هاوس ----
+      console.log(`🚀 جاري إرسال البيانات لموقع Pro House (فرع ${config.branch} - تاريخ ${iso})...`);
+      const res = await fetch(config.prohouseApiUrl, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify({
-          action: "importJuiceSales",
+          action: "importSalesByCategory",
           integrationToken: config.integrationToken,
-          payload: { date: iso, branch: config.branch, rows: juiceRows }
+          payload: { date: iso, branch: config.branch, rows: mappedRows }
         })
       });
-      const juiceJson = await juiceRes.json();
-      // فشل العصيرات ما لازم يلغي نجاح مبيعات التصنيفات اللي انبعتت فوق — بنسجّله وبنكمل
-      if (!juiceJson.ok) console.warn("⚠ فشل إرسال مبيعات العصيرات:", juiceJson.error);
-      else console.log("🥤 تم إرسال مبيعات العصيرات:", juiceRows);
-    } else {
-      console.log("🥤 ما لقينا منتجات عصيرات بتقرير المنتجات — تأكد من juiceCategories بـ config.json");
-    }
+      const json = await res.json();
+      if (!json.ok) throw new Error("رفض السيرفر البيانات: " + json.error);
 
-    console.log(`🎉 تم سحب وإرسال بيانات ${iso} لفرع ${config.branch} بنجاح!`, mappedRows);
+      // ---- 4) مبيعات العصيرات (لصفحة جرد العصيرات) ----
+      const juiceRows = pickJuiceRows(products, config.juiceCategories || DEFAULT_JUICE_CATEGORIES);
+      if (juiceRows.length) {
+        console.log(`🥤 جاري إرسال مبيعات ${juiceRows.length} عصير...`);
+        const juiceRes = await fetch(config.prohouseApiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            action: "importJuiceSales",
+            integrationToken: config.integrationToken,
+            payload: { date: iso, branch: config.branch, rows: juiceRows }
+          })
+        });
+        const juiceJson = await juiceRes.json();
+        if (!juiceJson.ok) console.warn("⚠ فشل إرسال مبيعات العصيرات:", juiceJson.error);
+        else console.log("🥤 تم إرسال مبيعات العصيرات:", juiceRows);
+      } else {
+        console.log("🥤 ما لقينا منتجات عصيرات بتقرير المنتجات — تأكد من juiceCategories بـ config.json");
+      }
 
-    // ---- 5) إشعارات الواتساب السحابية من GitHub Actions ----
-    if ((config.whatsappPhone || config.adminPhone) && (config.whatsappApiKey || config.whatsappToken)) {
-      const targetPhone = config.whatsappPhone || config.adminPhone;
-      const key = config.whatsappApiKey || config.whatsappToken;
-      const waText = encodeURIComponent(`📊 *تحديث سحابي أوتوماتيكي — Pro House*\n🏢 الفرع: ${config.branch}\n📅 التاريخ: ${iso}\n\n🎉 تم سحب وإرسال أحدث بيانات تابسنس بنجاح لفرع ${config.branch}.`);
-      try {
-        await fetch(`https://api.callmebot.com/whatsapp.php?phone=${targetPhone}&text=${waText}&apikey=${key}`);
-        console.log("📲 تم إرسال إشعار الواتساب السحابي بنجاح!");
-      } catch (waErr) {
-        console.warn("⚠ تعذر إرسال إشعار الواتساب السحابي:", waErr.message);
+      console.log(`🎉 تم سحب وإرسال بيانات ${iso} لفرع ${config.branch} بنجاح!`, mappedRows);
+
+      // ---- 5) إشعارات الواتساب السحابية من GitHub Actions ----
+      if ((config.whatsappPhone || config.adminPhone) && (config.whatsappApiKey || config.whatsappToken)) {
+        const targetPhone = config.whatsappPhone || config.adminPhone;
+        const key = config.whatsappApiKey || config.whatsappToken;
+        const waText = encodeURIComponent(`📊 *تحديث سحابي أوتوماتيكي — Pro House*\n🏢 الفرع: ${config.branch}\n📅 التاريخ: ${iso}\n\n🎉 تم سحب وإرسال أحدث بيانات تابسنس بنجاح لفرع ${config.branch}.`);
+        try {
+          await fetch(`https://api.callmebot.com/whatsapp.php?phone=${targetPhone}&text=${waText}&apikey=${key}`);
+          console.log("📲 تم إرسال إشعار الواتساب السحابي بنجاح!");
+        } catch (waErr) {
+          console.warn("⚠ تعذر إرسال إشعار الواتساب السحابي:", waErr.message);
+        }
       }
     }
+
   } catch (err) {
     console.error("❌ فشل السحب:", err.message);
     await page.screenshot({ path: path.join(DOWNLOAD_DIR, "error-screenshot.png") }).catch(() => {});

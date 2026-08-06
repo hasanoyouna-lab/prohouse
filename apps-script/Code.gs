@@ -681,6 +681,10 @@ function saveDay(p) {
   } else {
     appendRow(SHEET_NAMES.DAYMETA, metaObj);
   }
+
+  // تنبيه الإرجاع المرتفع — ما بيوقف الحفظ لو فشل الإرسال (الحفظ أهم من الإشعار)
+  try { checkAndSendReturnAlert_(p); } catch (e) { Logger.log('return alert failed: ' + e); }
+
   return { date: p.date, branch: p.branch, savedAt: savedAt };
 }
 
@@ -748,6 +752,12 @@ function saveTomorrowOrder(p) {
       qty: it.qty, notes: it.notes || '', employeeName: p.employeeName || '', savedAt: savedAt
     });
   });
+
+  // p.notify بتنبعت بس لما الموظف يضغط زر "حفظ الطلبية" — مو مع الحفظ التلقائي
+  if (p.notify) {
+    try { sendTomorrowOrderNotification_(p); } catch (e) { Logger.log('tomorrow notify failed: ' + e); }
+  }
+
   return { date: p.date, branch: p.branch, savedAt: savedAt };
 }
 
@@ -905,7 +915,7 @@ function getSettings() {
 // إعدادات ما لازم تطلع لأي حدا غير المالك. كل الأدوار بتحتاج getSettings (الفروع، ترتيب
 // التصنيفات، حدود التنبيه) — بس integrationToken بيسمح بالكتابة بدون جلسة موظف، فتسريبه
 // لموظف عادي بيلغي كل نظام الصلاحيات.
-var SECRET_SETTING_KEYS = ['integrationToken'];
+var SECRET_SETTING_KEYS = ['integrationToken', 'whatsappToken', 'whatsappInstanceId'];
 
 function getSettingsForClient_(employee) {
   var all = getSettings();
@@ -1073,22 +1083,43 @@ function sendWhatsAppMessage_(phone, text) {
   }
 }
 
+// شاشة الاستلام بتحفظ تلقائياً كل ما الموظف يكتب رقم (كل ~900 مللي ثانية). بدون منع التكرار
+// هون، كل ضغطة زر بتبعت رسالة واتساب — مئات الرسائل باليوم وحظر شبه أكيد للرقم.
+// نخزّن أي صنف تنبّهنا عنه بهذا اليوم+الفرع، وما نعيد التنبيه عنه مهما انحفظ بعدها.
+function alertedKey_(date, branch) { return 'wa:ret:' + date + ':' + branch; }
+
+function alreadyAlerted_(date, branch) {
+  var raw = PropertiesService.getScriptProperties().getProperty(alertedKey_(date, branch));
+  return raw ? raw.split('|') : [];
+}
+
+function markAlerted_(date, branch, itemIds) {
+  var props = PropertiesService.getScriptProperties();
+  var merged = alreadyAlerted_(date, branch).concat(itemIds);
+  var uniq = [];
+  merged.forEach(function (id) { if (uniq.indexOf(id) === -1) uniq.push(id); });
+  props.setProperty(alertedKey_(date, branch), uniq.join('|'));
+}
+
 function checkAndSendReturnAlert_(p) {
   var settings = getSettings();
-  var adminPhone = settings.adminPhone || settings.whatsappPhone || '966540024717';
+  var adminPhone = settings.adminPhone || settings.whatsappPhone || '';
   if (!adminPhone) return;
+  if (!settings.whatsappInstanceId && !settings.whatsappApiUrl && !settings.whatsappToken) return; // لسا ما انربط مزوّد
 
   var returnThreshold = settings.returnThresholdPct !== undefined && settings.returnThresholdPct !== ''
     ? Number(settings.returnThresholdPct) : 0.15; // 15% default
 
+  var seen = alreadyAlerted_(p.date, p.branch);
   var flaggedItems = [];
   (p.items || []).forEach(function (it) {
     var rec = Number(it.received) || 0;
     var ret = Number(it.returned) || 0;
-    if (rec > 0) {
+    if (rec > 0 && seen.indexOf(String(it.itemId)) === -1) {
       var pct = ret / rec;
       if (pct >= returnThreshold) {
         flaggedItems.push({
+          itemId: String(it.itemId),
           name: it.itemName,
           rec: rec,
           ret: ret,
@@ -1099,6 +1130,8 @@ function checkAndSendReturnAlert_(p) {
   });
 
   if (flaggedItems.length === 0) return;
+  // نسجّلها قبل الإرسال — لو فشل الإرسال ما بنعيد المحاولة بالحفظ الجاي (أفضل من إغراق الرقم)
+  markAlerted_(p.date, p.branch, flaggedItems.map(function (it) { return it.itemId; }));
 
   var msg = '🚨 *تنبيه إرجاع مرتفع — Pro House*\n';
   msg += '🏢 الفرع: ' + (p.branch || '') + '\n';
@@ -1112,10 +1145,18 @@ function checkAndSendReturnAlert_(p) {
   sendWhatsAppMessage_(adminPhone, msg);
 }
 
+// بتنبعت مرة وحدة بس لكل يوم+فرع، ولما الموظف يضغط "حفظ الطلبية" بإيده — مو مع الحفظ
+// التلقائي، وإلا الشيف بيوصله إشعار كل ما حدا يعدّل رقم بالطلبية.
 function sendTomorrowOrderNotification_(p) {
   var settings = getSettings();
-  var targetPhone = settings.chefPhone || settings.adminPhone || settings.whatsappPhone || '966540024717';
+  var targetPhone = settings.chefPhone || settings.adminPhone || settings.whatsappPhone || '';
   if (!targetPhone || !p.items || !p.items.length) return;
+  if (!settings.whatsappInstanceId && !settings.whatsappApiUrl && !settings.whatsappToken) return;
+
+  var props = PropertiesService.getScriptProperties();
+  var sentKey = 'wa:tom:' + p.date + ':' + p.branch;
+  if (props.getProperty(sentKey)) return;
+  props.setProperty(sentKey, nowIso());
 
   var msg = '📦 *طلبية جديدة للغد — Pro House*\n';
   msg += '🏢 الفرع: ' + (p.branch || '') + '\n';

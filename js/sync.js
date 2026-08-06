@@ -100,6 +100,13 @@ const Sync = (() => {
     return json.data;
   }
 
+  // نداء مباشر بانتظار النتيجة — للأفعال اللي بدنا نعرف نتيجتها فوراً (متل اختبار الواتساب)
+  // وإعادة المحاولة التلقائية إلها ما إلها معنى. مو للحفظ — الحفظ بيمر من enqueue.
+  async function call(action, payload) {
+    if (!API_URL) throw new Error("الباك اند مو مربوط");
+    return await postOnce(action, payload);
+  }
+
   // أخطاء الجلسة/الصلاحيات ما لازم تدخل بطابور إعادة المحاولة (رح تفشل كل مرة بنفس السبب) —
   // بدل هيك، نوقف المزامنة ونطلب تسجيل دخول جديد.
   function isAuthError(msg) {
@@ -141,5 +148,5 @@ const Sync = (() => {
   window.addEventListener("online", flushQueue);
   setInterval(flushQueue, 45000);
 
-  return { get, enqueue, flushQueue, getQueue, cacheGet, cacheSet, onStatusChange, emitStatus };
+  return { get, call, enqueue, flushQueue, getQueue, cacheGet, cacheSet, onStatusChange, emitStatus };
 })();

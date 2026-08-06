@@ -275,7 +275,9 @@ function saveTomorrowNow(showStatus) {
     .filter(it => currentTomorrowOrder[it.id] && currentTomorrowOrder[it.id].qty !== "")
     .map(it => ({ itemId: it.id, itemName: it.name, unit: it.unit, qty: currentTomorrowOrder[it.id].qty, notes: currentTomorrowOrder[it.id].notes || "" }));
 
-  const payload = { date: currentTomorrowDate, branch, employeeName, items };
+  // notify بس عند الضغط اليدوي على "حفظ الطلبية" — الحفظ التلقائي ما بيرسل إشعار للشيف،
+  // وإلا بيوصله إشعار كل ما حدا يعدّل رقم. والباك اند كمان بيرسل مرة وحدة لكل يوم+فرع.
+  const payload = { date: currentTomorrowDate, branch, employeeName, items, notify: !!showStatus };
   Sync.enqueue("saveTomorrowOrder:" + currentTomorrowDate + ":" + branch, "saveTomorrowOrder", payload);
   Sync.cacheSet("tomorrow:" + currentTomorrowDate + ":" + branch, items);
 
