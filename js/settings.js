@@ -110,8 +110,8 @@ function renderSettingsView() {
         <input type="tel" id="setChefPhone" value="${currentSettings.chefPhone || ""}" placeholder="966522222222">
       </div>
       <div class="field">
-        <label>رابط البوابة (API URL)</label>
-        <input type="url" id="setWhatsappApiUrl" value="${currentSettings.whatsappApiUrl || ""}" placeholder="https://api.green-api.com">
+        <label>رابط البوابة (apiUrl — انسخه من صفحة الـ instance، لكل حساب رابط خاص فيه)</label>
+        <input type="url" id="setWhatsappApiUrl" value="${currentSettings.whatsappApiUrl || ""}" placeholder="https://7107.api.greenapi.com">
       </div>
       <div class="field">
         <label>رقم الحساب (Instance ID)</label>

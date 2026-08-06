@@ -349,6 +349,10 @@ function doPost(e) {
         if (employee.role !== 'owner') throw new Error('غير مصرح');
         data = createDailySummaryTrigger();
         break;
+      case 'clearAllEntriesData':
+        if (employee.role !== 'owner') throw new Error('غير مصرح');
+        data = clearAllEntriesData();
+        break;
       case 'restoreAll':
         if (employee.role !== 'owner') throw new Error('غير مصرح');
         data = restoreAll(body.payload);
@@ -1054,8 +1058,12 @@ function sendWhatsAppMessage_(phone, text) {
   if (!cleanPhone) return false;
 
   try {
-    if (apiUrl && apiUrl.indexOf('green-api') !== -1) {
-      var url = apiUrl.replace(/\/$/, '') + '/waInstance' + instanceId + '/sendMessage/' + token;
+    // العلامة الحقيقية لـ Green API هي وجود instanceId، مو شكل الرابط: كل instance بياخد
+    // نطاق خاص فيه (مثل https://7107.api.greenapi.com) وبدون شرطة بكلمة greenapi، فالفحص
+    // القديم على النص 'green-api' كان بيفشل ويرمي الطلب على مسار خاطئ بدون أي رسالة خطأ.
+    if (instanceId) {
+      var base = (apiUrl || 'https://api.green-api.com').replace(/\/$/, '');
+      var url = base + '/waInstance' + instanceId + '/sendMessage/' + token;
       var payload = { chatId: (cleanPhone.indexOf('@') !== -1 ? cleanPhone : cleanPhone + '@c.us'), message: text };
       UrlFetchApp.fetch(url, {
         method: 'post',
@@ -1212,4 +1220,27 @@ function createDailySummaryTrigger() {
   ScriptApp.newTrigger('sendDailyWhatsAppSummary').timeBased().everyDays(1).atHour(23).create();
   return 'تم تفعيل مشغّل تقرير الواتساب اليومي (الساعة 11:00 مساءً).';
 }
+
+function clearAllEntriesData() {
+  clearSheetDataRows_(SHEET_NAMES.DAILY);
+  clearSheetDataRows_(SHEET_NAMES.DAYMETA);
+  clearSheetDataRows_(SHEET_NAMES.TOMORROW);
+  clearSheetDataRows_(SHEET_NAMES.JUICE_COUNTS);
+  clearSheetDataRows_(SHEET_NAMES.TABSENSE);
+  clearSheetDataRows_(SHEET_NAMES.JUICE_SALES);
+  return 'تم مسح كافة الإدخالات والبيانات السابقة بنجاح من الشيت.';
+}
+
+function clearSheetDataRows_(sheetName) {
+  try {
+    var s = sheet(sheetName);
+    var lastRow = s.getLastRow();
+    if (lastRow > 1) {
+      s.getRange(2, 1, lastRow - 1, s.getLastColumn()).clearContent();
+    }
+  } catch (e) {
+    Logger.log('clearSheetDataRows error: ' + e);
+  }
+}
+
 
