@@ -18,6 +18,8 @@ async function loadRemainingData(date, branch) {
   const view = document.getElementById("remainingView");
   if (view) view.innerHTML = '<div class="loader">جاري تجميع تقرير المتبقي والجرد والانحراف…</div>';
 
+  await Items.load();
+
   // 1) جلب تقرير الاستلام لنفس اليوم والفرع
   const receivingData = await Sync.get("getDay", { date: currentRemainingDate, branch: currentRemainingBranch }, "day:" + currentRemainingDate + ":" + currentRemainingBranch);
   

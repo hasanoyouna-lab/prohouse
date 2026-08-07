@@ -209,12 +209,13 @@ function initRemainingTab() {
   }
 }
 
-function startApp() {
+async function startApp() {
   hideLoginView();
   applyRoleUiGating();
   updateOfflineBanner();
   updateSyncBadge({ pending: Sync.getQueue().length });
   loadSettings();
+  await Items.load();
   initReceivingTab();
   initRemainingTab();
   initDashboardTab();

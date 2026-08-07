@@ -18,6 +18,8 @@ async function loadReceivingData(date, branch) {
   const view = document.getElementById("receivingView");
   if (view) view.innerHTML = '<div class="loader">جاري تحميل بيانات تقرير الاستلام…</div>';
 
+  await Items.load();
+
   // 1) جلب كمية الطلب المعتمدة ليوم date من طلبية أمس (T-1)
   const orderedMap = await loadRequestedQty(currentReceivingDate, currentReceivingBranch);
   currentReceivingOrdered = orderedMap || {};

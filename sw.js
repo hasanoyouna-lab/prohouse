@@ -1,7 +1,7 @@
-// Service Worker: Pro House Operations Center v4.0.0
+// Service Worker: Pro House Operations Center v4.0.1
 // يخزّن هيكل التطبيق (HTML/CSS/JS) محلياً لدعم العمل أوفلاين التام للموظفين والفروع.
 
-const CACHE_NAME = "prohouse-shell-v4.0.0";
+const CACHE_NAME = "prohouse-shell-v4.0.1";
 
 function isAppCode(url) {
   return url.pathname.endsWith(".html") || url.pathname.endsWith(".js") ||
