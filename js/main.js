@@ -5,6 +5,7 @@ const TAB_ROLE_ACCESS = {
   entry: ["owner", "manager", "chef", "employee"],
   tomorrow: ["owner", "manager", "chef", "employee"],
   juices: ["owner", "manager", "employee"],
+  checklist: ["owner", "manager", "chef", "employee"],
   report: ["owner", "manager", "chef"],
   items: ["owner", "manager", "employee"],
   settings: ["owner"]
@@ -15,8 +16,23 @@ function tabAllowed(tab) {
   return !!(role && TAB_ROLE_ACCESS[tab] && TAB_ROLE_ACCESS[tab].includes(role));
 }
 
+function openMobileSidebar() {
+  const sidebar = document.getElementById("appSidebar");
+  const backdrop = document.getElementById("sidebarBackdrop");
+  if (sidebar) sidebar.classList.add("mobile-open");
+  if (backdrop) backdrop.classList.add("active");
+}
+
+function closeMobileSidebar() {
+  const sidebar = document.getElementById("appSidebar");
+  const backdrop = document.getElementById("sidebarBackdrop");
+  if (sidebar) sidebar.classList.remove("mobile-open");
+  if (backdrop) backdrop.classList.remove("active");
+}
+
 function setActiveTab(tab) {
   if (!tabAllowed(tab)) tab = "dashboard";
+  closeMobileSidebar();
 
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
 
@@ -24,6 +40,7 @@ function setActiveTab(tab) {
   document.getElementById("entryView").classList.toggle("hidden", tab !== "entry");
   document.getElementById("tomorrowView").classList.toggle("hidden", tab !== "tomorrow");
   document.getElementById("juicesView").classList.toggle("hidden", tab !== "juices");
+  document.getElementById("checklistView").classList.toggle("hidden", tab !== "checklist");
   document.getElementById("reportContainer").classList.toggle("hidden", tab !== "report");
   document.getElementById("itemsView").classList.toggle("hidden", tab !== "items");
   document.getElementById("settingsView").classList.toggle("hidden", tab !== "settings");
@@ -31,20 +48,20 @@ function setActiveTab(tab) {
   document.getElementById("entryDateBar").classList.toggle("hidden", tab !== "entry");
   document.getElementById("tomorrowDateBar").classList.toggle("hidden", tab !== "tomorrow");
   document.getElementById("juiceDateBar").classList.toggle("hidden", tab !== "juices");
+  document.getElementById("checklistDateBar").classList.toggle("hidden", tab !== "checklist");
 
   document.getElementById("saveBarEntry").classList.toggle("hidden", tab !== "entry" || Auth.isViewOnlyEntry());
   document.getElementById("saveBarTomorrow").classList.toggle("hidden", tab !== "tomorrow" || Auth.isViewOnlyTomorrow());
   document.getElementById("saveBarJuices").classList.toggle("hidden", tab !== "juices" || Auth.isViewOnlyEntry());
+  document.getElementById("saveBarChecklist").classList.toggle("hidden", tab !== "checklist" || Auth.isViewOnlyEntry());
 
   if (tab === "dashboard") { renderDashboard(); }
-  // مكتبات الرسم البياني والتصدير بتنجلب أول ما تُفتح التقارير، وبعد ما توصل بنعيد الرسم
-  // حتى الرسم البياني يظهر لو كان التقرير انعرض قبل ما تخلص المكتبة تحميل.
+  if (tab === "checklist") { renderChecklistView(); }
   if (tab === "report") {
     loadReportLibs().then(() => {
       if (!document.getElementById("reportContainer").classList.contains("hidden")) redrawTrendChartIfReady();
     });
   }
-  // الفرع ممكن يكون تغيّر من شاشة تانية (كرت الفرع بالرئيسية) — نعيد التحميل بس وقتها
   if (tab === "juices" && currentJuiceBranch !== Branch.get()) { loadJuiceDay(currentJuiceDate); }
   if (tab === "items") { Items.load().then(renderItemsAdminView); }
   if (tab === "settings") { Promise.all([loadSettings(), Items.load()]).then(renderSettingsView); }
@@ -52,6 +69,12 @@ function setActiveTab(tab) {
 
 document.querySelectorAll(".tab-btn").forEach(btn => {
   btn.addEventListener("click", () => setActiveTab(btn.dataset.tab));
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("mobileToggleBtn")?.addEventListener("click", openMobileSidebar);
+  document.getElementById("sidebarCloseBtn")?.addEventListener("click", closeMobileSidebar);
+  document.getElementById("sidebarBackdrop")?.addEventListener("click", closeMobileSidebar);
 });
 
 // يخفي التابات الممنوعة حسب دور المستخدم المسجّل دخول
@@ -118,6 +141,17 @@ function hideLoginView() {
   document.querySelector("main").classList.remove("hidden");
 }
 
+function initChecklistTab() {
+  const el = document.getElementById("checklistDateInput");
+  if (el) {
+    el.value = currentChecklistDate;
+    el.addEventListener("change", (e) => {
+      currentChecklistDate = e.target.value;
+      renderChecklistView();
+    });
+  }
+}
+
 function startApp() {
   hideLoginView();
   applyRoleUiGating();
@@ -128,6 +162,7 @@ function startApp() {
   initEntryTab();
   initTomorrowTab();
   if (tabAllowed("juices")) initJuicesTab();
+  initChecklistTab();
   initReportTab();
   setActiveTab("dashboard");
 }

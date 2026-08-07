@@ -86,52 +86,343 @@ input, select, textarea{ transition:border-color .15s ease, background .15s ease
   *, *::before, *::after{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
 }
 
-/* ==================== الهيدر (أصفر، متطابق مع الهوية الرسمية) ==================== */
-header{
-  background:var(--yellow); color:var(--black); padding:14px 16px 10px;
-  position:sticky; top:0; z-index:20; border-bottom:5px solid var(--black);
+/* ==================== الهيكل الجانبي العمودي (App Layout & Vertical Sidebar) ==================== */
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  background: var(--bg);
+  position: relative;
 }
-.header-top{ display:flex; align-items:center; gap:10px; }
-.logo{ height:40px; }
-.logo-text{
-  font-family:"Tajawal", sans-serif; font-weight:800; font-size:16px; letter-spacing:.2px; line-height:1.1;
-  display:flex; flex-direction:column; color:var(--black);
-}
-.logo-text span{ color:var(--black); opacity:.65; }
-header .title-block{ flex:1; }
-header h1{ margin:0; font-size:17px; font-weight:800; letter-spacing:.2px; }
-header .sub{ font-size:11.5px; opacity:.75; margin-top:1px; font-weight:600; }
 
-.sync-badge{
-  font-size:11px; font-weight:800; padding:6px 12px; border-radius:999px;
-  background:var(--black); color:var(--yellow); white-space:nowrap; border:2px solid var(--black);
-  display:flex; align-items:center; gap:5px; cursor:pointer; font-family:inherit;
+/* --- الشريط الجانبي الفاخر (Sidebar) --- */
+.app-sidebar {
+  width: 275px;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  background: #0D0D0D;
+  color: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  border-left: 3px solid var(--black);
+  box-shadow: 4px 0 25px rgba(0, 0, 0, 0.15);
+  transition: transform 0.3s var(--ease);
 }
-.sync-badge.ok{ background:var(--green); color:#fff; border-color:var(--green); }
 
-.datebar{ display:flex; align-items:center; gap:8px; margin-top:12px; }
-.datebar input[type=date], .datebar input[type=month]{
-  flex:1; background:#fff; border:2px solid var(--black);
-  color:var(--black); border-radius:11px; padding:9px 10px; font-size:14px; font-family:inherit; font-weight:600;
+.sidebar-header {
+  padding: 20px 18px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
-.datebar select{
-  background:#fff; border:2px solid var(--black);
-  color:var(--black); border-radius:11px; padding:9px 10px; font-size:13px; font-family:inherit; font-weight:600;
-}
-.datebar select option{ color:#000; }
 
-.tabs{
-  display:flex; gap:6px; margin-top:12px; background:rgba(0,0,0,.08); border-radius:13px;
-  padding:4px; overflow-x:auto;
+.sidebar-brand-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
-.tab-btn{
-  flex:1 0 auto; text-align:center; padding:9px 12px; border-radius:10px; border:none;
-  background:transparent; color:var(--black); font-size:12.5px; font-weight:800; opacity:.6;
-  font-family:inherit; cursor:pointer; white-space:nowrap;
-}
-.tab-btn.active{ background:var(--black); color:var(--yellow); opacity:1; }
 
-main{ padding:16px 12px 10px; max-width:640px; margin:0 auto; }
+.sidebar-logo {
+  height: 42px;
+  width: auto;
+  filter: drop-shadow(0 2px 8px rgba(247, 220, 78, 0.2));
+}
+
+.sidebar-title-block .brand-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--yellow);
+  letter-spacing: 0.3px;
+}
+
+.sidebar-title-block .sub {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.sidebar-close-btn {
+  display: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #FFF;
+  border: none;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+}
+.sidebar-close-btn:hover { background: rgba(255, 255, 255, 0.2); }
+
+/* --- قائمة الصفحات الجانبية (Sidebar Nav) --- */
+.sidebar-nav {
+  flex: 1;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1.5px solid transparent;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: right;
+  transition: all 0.18s var(--ease);
+  position: relative;
+}
+
+.nav-icon {
+  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  transition: transform 0.2s var(--ease);
+}
+
+.nav-text {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.nav-item:hover {
+  background: rgba(247, 220, 78, 0.12);
+  color: var(--yellow);
+  transform: translateX(-4px);
+}
+
+.nav-item:hover .nav-icon {
+  transform: scale(1.15);
+}
+
+.nav-item.active {
+  background: var(--yellow);
+  color: var(--black);
+  font-weight: 800;
+  border-color: var(--black);
+  box-shadow: -4px 4px 0 rgba(0, 0, 0, 0.5);
+  transform: none;
+}
+
+.nav-item.active .nav-icon {
+  transform: scale(1.1);
+}
+
+/* --- فوتر المستخدم (Sidebar User Card) --- */
+.sidebar-user {
+  padding: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.sidebar-user-card {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sidebar-user-card .user-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sidebar-user-card .user-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: #FFF;
+}
+
+.sidebar-user-card .user-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.logout-btn {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.12);
+  color: #FFF;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s ease;
+}
+
+.logout-btn:hover { background: rgba(255, 255, 255, 0.22); }
+.logout-btn.danger { background: rgba(214, 47, 47, 0.25); color: #FF8080; border-color: rgba(214, 47, 47, 0.4); }
+.logout-btn.danger:hover { background: rgba(214, 47, 47, 0.45); }
+
+/* ==================== منطقة المحتوى الرئيسية (App Body & Main) ==================== */
+.app-body {
+  flex: 1;
+  margin-right: 275px; /* يدعم اتجاه RTL ليكون فراغ للشريط الجانبي اليمين */
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: calc(100% - 275px);
+}
+
+.app-topbar {
+  background: var(--yellow);
+  border-bottom: 3.5px solid var(--black);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.topbar-brand {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--black);
+}
+
+.mobile-toggle-btn {
+  display: none;
+  background: var(--black);
+  color: var(--yellow);
+  border: 2px solid var(--black);
+  padding: 7px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.2);
+}
+
+.sync-badge {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--black);
+  color: var(--yellow);
+  white-space: nowrap;
+  border: 2px solid var(--black);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.15);
+}
+.sync-badge.ok { background: var(--green); color: #fff; border-color: var(--green); }
+
+.topbar-datebars {
+  background: #FAFAFA;
+  border-bottom: 1.5px solid var(--border-soft);
+  padding: 10px 24px;
+}
+
+.datebar { display: flex; align-items: center; gap: 8px; }
+.datebar input[type=date], .datebar input[type=month] {
+  flex: 1; max-width: 320px; background: #fff; border: 2px solid var(--black);
+  color: var(--black); border-radius: 11px; padding: 8px 12px; font-size: 14px; font-family: inherit; font-weight: 700;
+}
+.datebar select {
+  background: #fff; border: 2px solid var(--black);
+  color: var(--black); border-radius: 11px; padding: 8px 12px; font-size: 13.5px; font-family: inherit; font-weight: 700;
+}
+
+.app-main {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* --- ضبط شريط الحفظ السفلي مع الشريط الجانبي --- */
+.save-bar {
+  right: 275px;
+  left: 0;
+  border-top: 3px solid var(--black);
+  box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.08);
+}
+
+/* ==================== التجاوب مع الجوالات (Responsive & Mobile Drawer) ==================== */
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  z-index: 99;
+}
+.sidebar-backdrop.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (max-width: 860px) {
+  .app-body {
+    margin-right: 0;
+    width: 100%;
+  }
+
+  .app-sidebar {
+    transform: translateX(100%); /* يخفي الشريط للخارج جهة اليمين */
+    width: 280px;
+    z-index: 1000;
+  }
+
+  .app-sidebar.mobile-open {
+    transform: translateX(0); /* يسحب القائمة للداخل بأسلوب الدرور */
+  }
+
+  .sidebar-close-btn {
+    display: block;
+  }
+
+  .mobile-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .app-main {
+    padding: 16px 12px 90px;
+  }
+
+  .save-bar {
+    right: 0;
+  }
+}
 
 .cat-title{
   font-size:13px; font-weight:800; color:var(--black); margin:18px 0 8px; padding:8px 12px;

@@ -110,12 +110,24 @@ async function runReport() {
   const { start, end } = currentReportRange();
   lastReportRange = { start, end };
 
-  const data = await Sync.get("getReport", { start, end }, "report:" + start + ":" + end, (val) => {
-    lastReportData = val;
-    renderReport(val);
-  });
-  lastReportData = data;
-  renderReport(data);
+  const cacheKey = "report:" + start + ":" + end;
+  try {
+    localStorage.removeItem("ph_cache:" + cacheKey);
+    localStorage.removeItem("ph_cache:tabsense:" + start + ":" + end);
+  } catch (e) {}
+
+  const [data, salesData] = await Promise.all([
+    Sync.get("getReport", { start, end }, cacheKey),
+    Sync.get("getSalesByCategory", { start, end }, "tabsense:" + start + ":" + end)
+  ]);
+
+  const reportObj = data || { days: [], totals: [], flaggedCount: 0 };
+  if (salesData && Array.isArray(salesData)) {
+    reportObj.tabsenseSales = salesData;
+  }
+
+  lastReportData = reportObj;
+  renderReport(reportObj);
 }
 
 // يعيد بناء "الإجمالي حسب الصنف" من مجموعة أيام مفلترة (يطابق منطق السيرفر لكن على العميل)
@@ -159,13 +171,132 @@ function applyReportFilters(data) {
   return { days, totals, flaggedCount };
 }
 
+function renderTabSenseSalesBlock(data) {
+  const tabsenseSales = (data && data.tabsenseSales) || [];
+  const juiceSales = (data && data.juiceSales) || [];
+
+  const branchFilter = document.getElementById("reportBranchFilter").value;
+  let filteredTabsense = tabsenseSales;
+  let filteredJuice = juiceSales;
+
+  if (branchFilter) {
+    filteredTabsense = filteredTabsense.filter(r => r.branch === branchFilter);
+    filteredJuice = filteredJuice.filter(r => r.branch === branchFilter);
+  }
+
+  if (!filteredTabsense.length && !filteredJuice.length) {
+    return `<div class="empty-state">لا توجد بيانات مبيعات مسحوبة من تابسنس لهذه الفترة/الفلترة بعد.</div>`;
+  }
+
+  // 1) إجمالي حسب التصنيف
+  const catTotals = {};
+  filteredTabsense.forEach(r => {
+    catTotals[r.category] = (catTotals[r.category] || 0) + Number(r.qty || 0);
+  });
+
+  // 2) تفاصيل حسب اليوم والفرع
+  const byDateBranch = {};
+  filteredTabsense.forEach(r => {
+    const key = `${r.date} — ${r.branch}`;
+    if (!byDateBranch[key]) byDateBranch[key] = {};
+    byDateBranch[key][r.category] = (byDateBranch[key][r.category] || 0) + Number(r.qty || 0);
+  });
+
+  // 3) إجمالي العصيرات حسب المنتج
+  const juiceTotals = {};
+  filteredJuice.forEach(r => {
+    juiceTotals[r.productName] = (juiceTotals[r.productName] || 0) + Number(r.qty || 0);
+  });
+
+  let html = `
+    <div class="cat-title">📈 إجمالي كميات مبيعات تابسنس (حسب التصنيف)</div>
+    <div class="dash-tile" style="margin-bottom:16px;">
+  `;
+
+  const cats = Object.keys(catTotals);
+  if (cats.length) {
+    cats.forEach(c => {
+      html += `
+        <div>
+          <div class="lbl">${c}</div>
+          <div class="big" style="color:var(--black);">${catTotals[c]}</div>
+        </div>
+      `;
+    });
+  } else {
+    html += `<div><div class="lbl">المبيعات</div><div class="big">—</div></div>`;
+  }
+  html += `</div>`;
+
+  const keys = Object.keys(byDateBranch).sort();
+  if (keys.length) {
+    html += `
+      <div class="cat-title">تفاصيل المبيعات حسب اليوم والفرع</div>
+      <div class="order-table-wrap" style="margin-bottom:20px;">
+        <table class="order-table">
+          <thead>
+            <tr><th>اليوم والفرع</th>${cats.map(c => `<th>${c}</th>`).join("")}</tr>
+          </thead>
+          <tbody>
+            ${keys.map(k => `
+              <tr>
+                <td class="cat-cell">${k}</td>
+                ${cats.map(c => `<td>${byDateBranch[k][c] || 0}</td>`).join("")}
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  const juices = Object.keys(juiceTotals);
+  if (juices.length) {
+    html += `
+      <div class="cat-title">🥤 إجمالي مبيعات العصيرات والمنتجات (من تابسنس)</div>
+      <div class="order-table-wrap" style="margin-bottom:20px;">
+        <table class="order-table">
+          <thead><tr><th>اسم المنتج</th><th>الكمية المباعة</th></tr></thead>
+          <tbody>
+            ${juices.map(j => `
+              <tr><td class="cat-cell">${j}</td><td><strong>${juiceTotals[j]}</strong></td></tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  return html;
+}
+
 function renderReport(data) {
   const view = document.getElementById("reportView");
+  const reportType = document.getElementById("reportType").value;
   const filtered = applyReportFilters(data);
   lastFilteredDays = filtered.days;
 
+  if (reportType === "tabsense") {
+    view.innerHTML = renderTabSenseSalesBlock(data);
+    return;
+  }
+
+  const hasSalesData = data && ((data.tabsenseSales && data.tabsenseSales.length) || (data.juiceSales && data.juiceSales.length));
+
   if (!filtered.days.length) {
-    view.innerHTML = '<div class="empty-state">مافي بيانات محفوظة لهذه الفترة/الفلترة بعد.<br>ابدأ بتعبئة تاب "طلبية اليوم".</div>';
+    if (hasSalesData) {
+      view.innerHTML = `
+        <div class="summary-banner" style="background:#fff9c4;border-color:#fbc02d;color:#573b00;margin-bottom:16px;">
+          <div class="lbl" style="color:#573b00;font-size:13.5px;font-weight:800;">
+            💡 لم يتم تسجيل كميات استلام يومية بتاب "طلبية اليوم" لهذه الفترة بعد.<br>
+            أدناه تقرير مبيعات تابسنس المسحوبة تلقائياً لهذه الفترة:
+          </div>
+        </div>
+        ${renderTabSenseSalesBlock(data)}
+      `;
+    } else {
+      view.innerHTML = '<div class="empty-state">مافي بيانات محفوظة لهذه الفترة/الفلترة بعد.<br>ابدأ بتعبئة تاب "طلبية اليوم".</div>';
+    }
     return;
   }
 

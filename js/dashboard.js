@@ -53,12 +53,17 @@ async function loadBranchStatus(branch) {
   const juicesCounted = ((juiceDay && juiceDay.items) || [])
     .filter(r => r.counted !== "" && r.counted != null && !isNaN(Number(r.counted))).length;
 
+  const chkStats = typeof Checklist !== "undefined" ? Checklist.getCompletionStats(today, branch, "morning") : null;
+  const checklistComplete = !!(chkStats && chkStats.isComplete);
+  const checklistPercent = chkStats ? chkStats.percent : 0;
+
   return {
     branch, total, confirmed, touched, status,
     mealsToday: mealsFromDayItems(items),
     mealsYesterday: mealsFromDayItems((yesterdayData && yesterdayData.items) || []),
     tomorrowSaved: !!(tomorrowOrder && tomorrowOrder.length),
-    juicesTotal, juicesCounted
+    juicesTotal, juicesCounted,
+    checklistComplete, checklistPercent
   };
 }
 
@@ -87,6 +92,9 @@ function buildTasks(statuses) {
     if (!Auth.canEditBranch(s.branch)) return; // الشيف/المالك بيشوفوا كل الفروع بس المهام لأصحابها
     const label = statuses.length > 1 ? ` — ${s.branch}` : "";
 
+    if (!s.checklistComplete) {
+      tasks.push({ icon: "📋", text: `قائمة فحص شفت الصباح لم تكتمل (${s.checklistPercent}%)${label}`, tab: "checklist", branch: s.branch });
+    }
     const remaining = s.total - s.confirmed;
     if (remaining > 0) {
       tasks.push({ icon: "📝", text: `باقي ${remaining} صنف ما تأكّد استلامه${label}`, tab: "entry", branch: s.branch });

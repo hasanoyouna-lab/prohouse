@@ -148,6 +148,16 @@ function renderSettingsView() {
       </div>
       <div class="save-status" id="backupStatus"></div>
     </div>
+
+    <div class="settings-card" style="border-color:var(--red);">
+      <h3 style="color:var(--red);">🗑 مسح كافة البيانات السابقة والبدء من جديد</h3>
+      <div class="pin-note" style="margin-bottom:12px;">
+        سيؤدي هذا الإجراء لمسح كافة إدخالات الاستلام، المرتجعات، طلبات الغد، وجرد العصيرات السابقة للبدء بإدخال جديد.
+      </div>
+      <button class="btn" id="clearAllDataBtn" style="background:var(--red);color:#fff;border-color:var(--red);width:100%;">
+        🗑 مسح جميع الإدخالات السابقة والبدء من جديد
+      </button>
+    </div>
   `;
 
   document.getElementById("saveBrandBtn").addEventListener("click", () => {
@@ -245,6 +255,49 @@ function renderSettingsView() {
 
   document.getElementById("backupBtn").addEventListener("click", doBackup);
   document.getElementById("restoreFile").addEventListener("change", doRestore);
+
+  const clearDataBtn = document.getElementById("clearAllDataBtn");
+  if (clearDataBtn) {
+    clearDataBtn.addEventListener("click", async () => {
+      if (!confirm("⚠️ هل أنت متأكد من مسح جميع بيانات وإدخالات الاستلام والمرتجعات والجرد السابقة كلياً للبدء من جديد؟")) return;
+
+      clearDataBtn.disabled = true;
+      clearDataBtn.textContent = "جاري مسح البيانات...";
+
+      clearAllLocalEntries();
+
+      try {
+        if (typeof Sync !== "undefined" && Sync.request) {
+          await Sync.request("clearAllEntriesData", {});
+        }
+      } catch (e) {
+        console.warn("تنبيه أثناء مسح بيانات الباك اند:", e);
+      }
+
+      alert("🎉 تم مسح كافة البيانات والإدخالات السابقة بنجاح! يمكنك الآن البدء من جديد اعتبارا من الأحد إن شاء الله.");
+      location.reload();
+    });
+  }
+}
+
+function clearAllLocalEntries() {
+  const keysToRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && (
+      key.startsWith("prohouse_") ||
+      key.startsWith("ph_cache:") ||
+      key.startsWith("day:") ||
+      key.startsWith("tomorrow:") ||
+      key.startsWith("juiceday:") ||
+      key.startsWith("report:")
+    )) {
+      if (key !== "ph_token" && key !== "ph_employee_v2") {
+        keysToRemove.push(key);
+      }
+    }
+  }
+  keysToRemove.forEach(k => localStorage.removeItem(k));
 }
 
 async function doBackup() {

@@ -299,6 +299,9 @@ function doPost(e) {
       requireIntegrationToken_(body.integrationToken);
       return jsonOut({ ok: true, data: importJuiceSales(body.payload) });
     }
+    if (body.action === 'clearAllEntriesData') {
+      return jsonOut({ ok: true, data: clearAllEntriesData() });
+    }
 
     var employee = requireSession_(body.token);
     var data;
@@ -699,9 +702,14 @@ function getReport(start, end, branchFilter) {
   var allEntries = readRows(SHEET_NAMES.DAILY).rows.filter(function (r) { return r.date >= start && r.date <= end; });
   var allMeta = readRows(SHEET_NAMES.DAYMETA).rows.filter(function (r) { return r.date >= start && r.date <= end; });
 
+  var tabsenseSales = readRows(SHEET_NAMES.TABSENSE).rows.filter(function (r) { return r.date >= start && r.date <= end; });
+  var juiceSales = readRows(SHEET_NAMES.JUICE_SALES).rows.filter(function (r) { return r.date >= start && r.date <= end; });
+
   if (branchFilter && branchFilter.length) {
     allEntries = allEntries.filter(function (r) { return branchFilter.indexOf(r.branch) !== -1; });
     allMeta = allMeta.filter(function (r) { return branchFilter.indexOf(r.branch) !== -1; });
+    tabsenseSales = tabsenseSales.filter(function (r) { return branchFilter.indexOf(r.branch) !== -1; });
+    juiceSales = juiceSales.filter(function (r) { return branchFilter.indexOf(r.branch) !== -1; });
   }
 
   // نجمع حسب (التاريخ + الفرع) — كل فرع بيوم معين سجل مستقل بروابطه وموظفه الخاص،
@@ -738,7 +746,7 @@ function getReport(start, end, branchFilter) {
     return t;
   });
 
-  return { days: days, totals: totals, flaggedCount: flaggedCount };
+  return { days: days, totals: totals, flaggedCount: flaggedCount, tabsenseSales: tabsenseSales, juiceSales: juiceSales };
 }
 
 // ==================== Tomorrow orders ====================

@@ -5,7 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Pro House — استلام وإرجاع الأصناف</title>
 <meta name="theme-color" content="#F7DC4E">
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=2.2.0">
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(reg => reg.unregister());
+  });
+  if (window.caches) {
+    caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+  }
+}
+</script>
 </head>
 <body>
 
@@ -20,130 +30,187 @@
   </div>
 </div>
 
-<header>
-  <div class="header-top">
-    <img id="headerLogoImg" class="logo" src="assets/logo.png" alt="Pro House">
-    <div id="headerLogoText" class="logo-text hidden">PRO<span>HOUSE</span></div>
-    <div class="title-block">
-      <h1 class="brand-name">Pro House</h1>
-      <div class="sub">إدارة طلبيات برو هاوس</div>
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+<div class="pin-dialog hidden" id="pinDialog">
+  <div class="pin-dialog-card">
+    <h3>تغيير الرقم السري</h3>
+    <div class="field">
+      <label>رقمك الحالي</label>
+      <input type="password" inputmode="numeric" id="pinCurrent" autocomplete="off" maxlength="8">
     </div>
-    <button class="sync-badge" id="syncBadge" title="حالة المزامنة">🔄 متصل</button>
-  </div>
-
-  <div class="user-bar hidden" id="userBar">
-    <span id="userBarName"></span>
-    <span class="badge neutral" id="userBarRole"></span>
-    <button class="logout-btn" id="changePinBtn">🔑 غيّر رقمي</button>
-    <button class="logout-btn" id="logoutBtn">خروج</button>
-  </div>
-
-  <div class="pin-dialog hidden" id="pinDialog">
-    <div class="pin-dialog-card">
-      <h3>تغيير الرقم السري</h3>
-      <div class="field">
-        <label>رقمك الحالي</label>
-        <input type="password" inputmode="numeric" id="pinCurrent" autocomplete="off" maxlength="8">
-      </div>
-      <div class="field">
-        <label>الرقم الجديد (من ٤ لـ ٨ أرقام)</label>
-        <input type="password" inputmode="numeric" id="pinNew" autocomplete="off" maxlength="8">
-      </div>
-      <div class="field">
-        <label>أعد كتابة الرقم الجديد</label>
-        <input type="password" inputmode="numeric" id="pinConfirm" autocomplete="off" maxlength="8">
-      </div>
-      <div class="login-error hidden" id="pinError"></div>
-      <div class="toolbar" style="margin-bottom:0;">
-        <button class="btn gold" id="pinSaveBtn">حفظ</button>
-        <button class="btn" id="pinCancelBtn">إلغاء</button>
-      </div>
-      <div class="pin-note">بعد الحفظ رح تحتاج تسجّل دخول بالرقم الجديد.</div>
+    <div class="field">
+      <label>الرقم الجديد (من ٤ لـ ٨ أرقام)</label>
+      <input type="password" inputmode="numeric" id="pinNew" autocomplete="off" maxlength="8">
     </div>
+    <div class="field">
+      <label>أعد كتابة الرقم الجديد</label>
+      <input type="password" inputmode="numeric" id="pinConfirm" autocomplete="off" maxlength="8">
+    </div>
+    <div class="login-error hidden" id="pinError"></div>
+    <div class="toolbar" style="margin-bottom:0;">
+      <button class="btn gold" id="pinSaveBtn">حفظ</button>
+      <button class="btn" id="pinCancelBtn">إلغاء</button>
+    </div>
+    <div class="pin-note">بعد الحفظ رح تحتاج تسجّل دخول بالرقم الجديد.</div>
   </div>
+</div>
 
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="dashboard">🏠 الرئيسية</button>
-    <button class="tab-btn" data-tab="entry">📝 طلبية اليوم</button>
-    <button class="tab-btn" data-tab="tomorrow">📦 طلبية الغد</button>
-    <button class="tab-btn" data-tab="juices">🥤 جرد العصيرات</button>
-    <button class="tab-btn" data-tab="report">📊 التقارير</button>
-    <button class="tab-btn" data-tab="items">🍽 إدارة الأصناف</button>
-    <button class="tab-btn" data-tab="settings">⚙ الإعدادات</button>
-  </div>
-
-  <div class="datebar hidden" id="entryDateBar">
-    <input type="date" id="dateInput">
-  </div>
-  <div class="datebar hidden" id="tomorrowDateBar">
-    <input type="date" id="tomorrowDateInput">
-  </div>
-  <div class="datebar hidden" id="juiceDateBar">
-    <input type="date" id="juiceDateInput">
-  </div>
-</header>
-
-<main>
-  <div id="offlineBanner" class="offline-banner hidden">غير متصل بالإنترنت — بتشتغل ببيانات محفوظة محلياً وبتتزامن لما يرجع النت</div>
-
-  <div id="dashboardView" class="view"></div>
-
-  <div id="entryView" class="view hidden"></div>
-
-  <div id="tomorrowView" class="view hidden"></div>
-
-  <div id="juicesView" class="view hidden"></div>
-
-  <div id="reportContainer" class="view hidden">
-    <div class="toolbar">
-      <select id="reportType">
-        <option value="entries">تقرير الاستلام/الإرجاع</option>
-        <option value="tomorrow">طلبية الغد (للشيف)</option>
-      </select>
+<div class="app-layout">
+  <aside class="app-sidebar" id="appSidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-brand-block">
+        <img id="headerLogoImg" class="sidebar-logo" src="assets/logo.png" alt="Pro House">
+        <div id="headerLogoText" class="logo-text hidden">PRO<span>HOUSE</span></div>
+        <div class="sidebar-title-block">
+          <h1 class="brand-name">Pro House</h1>
+          <div class="sub">إدارة طلبيات برو هاوس</div>
+        </div>
+      </div>
+      <button class="sidebar-close-btn" id="sidebarCloseBtn" aria-label="إغلاق">✕</button>
     </div>
 
-    <div id="entriesReportControls">
-      <div class="toolbar">
-        <select id="reportMode">
-          <option value="day">يوم</option>
-          <option value="month" selected>شهر</option>
-          <option value="range">فترة</option>
-        </select>
-        <input type="date" id="reportDayInput" class="hidden">
-        <input type="month" id="reportMonthInput">
-        <input type="date" id="reportStartInput" class="hidden">
-        <span class="hidden" id="reportRangeSep">←</span>
-        <input type="date" id="reportEndInput" class="hidden">
-        <button class="btn primary" id="reportGoBtn">عرض</button>
-        <button class="btn gold" id="exportExcelBtn">⬇ تصدير Excel</button>
+    <nav class="sidebar-nav tabs">
+      <button class="tab-btn nav-item active" data-tab="dashboard">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">الرئيسية</span>
+      </button>
+      <button class="tab-btn nav-item" data-tab="entry">
+        <span class="nav-icon">📝</span>
+        <span class="nav-text">طلبية اليوم</span>
+      </button>
+      <button class="tab-btn nav-item" data-tab="tomorrow">
+        <span class="nav-icon">📦</span>
+        <span class="nav-text">طلبية الغد</span>
+      </button>
+      <button class="tab-btn nav-item" data-tab="juices">
+        <span class="nav-icon">🥤</span>
+        <span class="nav-text">جرد العصيرات</span>
+      </button>
+      <button class="tab-btn nav-item" data-tab="checklist">
+        <span class="nav-icon">📋</span>
+        <span class="nav-text">قائمة الفحص</span>
+      </button>
+      <button class="tab-btn nav-item" data-tab="report">
+        <span class="nav-icon">📊</span>
+        <span class="nav-text">التقارير والمبيعات</span>
+      </button>
+      <button class="tab-btn nav-item" data-tab="items">
+        <span class="nav-icon">🍽️</span>
+        <span class="nav-text">إدارة الأصناف</span>
+      </button>
+      <button class="tab-btn nav-item" data-tab="settings">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-text">الإعدادات</span>
+      </button>
+    </nav>
+
+    <div class="user-bar hidden sidebar-user" id="userBar">
+      <div class="sidebar-user-card">
+        <div class="user-info">
+          <span id="userBarName" class="user-name"></span>
+          <span class="badge neutral" id="userBarRole"></span>
+        </div>
+        <div class="user-actions">
+          <button class="logout-btn" id="changePinBtn" title="تغيير الرقم السري">🔑 الرقم السري</button>
+          <button class="logout-btn danger" id="logoutBtn" title="خروج">🚪 خروج</button>
+        </div>
       </div>
-      <div class="toolbar">
-        <select id="reportBranchFilter"><option value="">كل الفروع</option></select>
-        <select id="reportCategoryFilter"><option value="">كل التصنيفات</option></select>
-        <select id="reportEmployeeFilter"><option value="">كل الموظفين</option></select>
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;cursor:pointer;">
-          <input type="checkbox" id="reportFlaggedOnly" style="width:auto;">
-          الأصناف المرتفعة الإرجاع بس
-        </label>
+    </div>
+  </aside>
+
+  <div class="app-body">
+    <header class="app-topbar">
+      <button class="mobile-toggle-btn" id="mobileToggleBtn" aria-label="القائمة الجانبية">☰ القائمة</button>
+      <div class="topbar-title-block">
+        <div class="topbar-brand brand-name">Pro House</div>
       </div>
-      <div id="reportView"></div>
+      <div class="topbar-right">
+        <button class="sync-badge" id="syncBadge" title="حالة المزامنة">🔄 متصل</button>
+      </div>
+    </header>
+
+    <div class="topbar-datebars">
+      <div class="datebar hidden" id="entryDateBar">
+        <input type="date" id="dateInput">
+      </div>
+      <div class="datebar hidden" id="tomorrowDateBar">
+        <input type="date" id="tomorrowDateInput">
+      </div>
+      <div class="datebar hidden" id="juiceDateBar">
+        <input type="date" id="juiceDateInput">
+      </div>
+      <div class="datebar hidden" id="checklistDateBar">
+        <input type="date" id="checklistDateInput">
+      </div>
     </div>
 
-    <div id="tomorrowReportControls" class="hidden">
-      <div class="toolbar">
-        <input type="date" id="tomorrowReportDate">
-        <select id="tomorrowReportBranch"><option value="">كل الفروع</option></select>
-        <button class="btn primary" id="tomorrowReportGoBtn">عرض</button>
-        <button class="btn gold" id="tomorrowReportExportBtn">⬇ تصدير Excel</button>
+    <main class="app-main">
+      <div id="offlineBanner" class="offline-banner hidden">غير متصل بالإنترنت — بتشتغل ببيانات محفوظة محلياً وبتتزامن لما يرجع النت</div>
+
+      <div id="dashboardView" class="view"></div>
+
+      <div id="entryView" class="view hidden"></div>
+
+      <div id="tomorrowView" class="view hidden"></div>
+
+      <div id="juicesView" class="view hidden"></div>
+
+      <div id="checklistView" class="view hidden"></div>
+
+      <div id="reportContainer" class="view hidden">
+        <div class="toolbar">
+          <select id="reportType">
+            <option value="entries">تقرير الاستلام/الإرجاع ومقارنة المبيعات</option>
+            <option value="tabsense">📈 تقرير مبيعات تابسنس (مباشر)</option>
+            <option value="tomorrow">طلبية الغد (للشيف)</option>
+          </select>
+        </div>
+
+        <div id="entriesReportControls">
+          <div class="toolbar">
+            <select id="reportMode">
+              <option value="day">يوم</option>
+              <option value="month" selected>شهر</option>
+              <option value="range">فترة</option>
+            </select>
+            <input type="date" id="reportDayInput" class="hidden">
+            <input type="month" id="reportMonthInput">
+            <input type="date" id="reportStartInput" class="hidden">
+            <span class="hidden" id="reportRangeSep">←</span>
+            <input type="date" id="reportEndInput" class="hidden">
+            <button class="btn primary" id="reportGoBtn">عرض</button>
+            <button class="btn gold" id="exportExcelBtn">⬇ تصدير Excel</button>
+          </div>
+          <div class="toolbar">
+            <select id="reportBranchFilter"><option value="">كل الفروع</option></select>
+            <select id="reportCategoryFilter"><option value="">كل التصنيفات</option></select>
+            <select id="reportEmployeeFilter"><option value="">كل الموظفين</option></select>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;cursor:pointer;">
+              <input type="checkbox" id="reportFlaggedOnly" style="width:auto;">
+              الأصناف المرتفعة الإرجاع بس
+            </label>
+          </div>
+          <div id="reportView"></div>
+        </div>
+
+        <div id="tomorrowReportControls" class="hidden">
+          <div class="toolbar">
+            <input type="date" id="tomorrowReportDate">
+            <select id="tomorrowReportBranch"><option value="">كل الفروع</option></select>
+            <button class="btn primary" id="tomorrowReportGoBtn">عرض</button>
+            <button class="btn gold" id="tomorrowReportExportBtn">⬇ تصدير Excel</button>
+          </div>
+          <div id="tomorrowReportView"></div>
+        </div>
       </div>
-      <div id="tomorrowReportView"></div>
-    </div>
+
+      <div id="itemsView" class="view hidden"></div>
+
+      <div id="settingsView" class="view hidden"></div>
+    </main>
   </div>
-
-  <div id="itemsView" class="view hidden"></div>
-
-  <div id="settingsView" class="view hidden"></div>
-</main>
+</div>
 
 <div class="save-bar hidden" id="saveBarEntry">
   <div class="save-status" id="saveStatus">لسا ما تحفظ شي لهذا اليوم</div>
@@ -160,23 +227,29 @@
   <button class="save-btn" id="juiceSaveBtn">💾 حفظ الجرد</button>
 </div>
 
+<div class="save-bar hidden" id="saveBarChecklist">
+  <div class="save-status" id="checklistStatus">لسا ما تحفظ شيء لقائمة الفحص</div>
+  <button class="save-btn" id="checklistSaveBtn" onclick="saveChecklistData()">💾 حفظ وإعتماد الفحص</button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- ExcelJS و Chart.js ما بينحمّلوا مع الإقلاع — بينجلبوا بس أول ما تُفتح شاشة التقارير
      (شوف loadReportLibs بـ js/report.js). حجمهم مع بعض أكبر من التطبيق كله، وأغلب الموظفين
      ما بيفتحوا التقارير أصلاً؛ تحميلهم بالبداية كان بيبطّئ الفتح على جوالات النت الضعيف. -->
-<script src="js/config.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/sync.js"></script>
-<script src="js/entry.js"></script>
-<script src="js/items.js"></script>
-<script src="js/forecast.js"></script>
-<script src="js/tomorrow.js"></script>
-<script src="js/juices.js"></script>
-<script src="js/report.js"></script>
-<script src="js/settings.js"></script>
-<script src="js/dashboard.js"></script>
-<script src="js/main.js"></script>
+<script src="js/config.js?v=2.2.0"></script>
+<script src="js/auth.js?v=2.2.0"></script>
+<script src="js/sync.js?v=2.2.0"></script>
+<script src="js/entry.js?v=2.2.0"></script>
+<script src="js/items.js?v=2.2.0"></script>
+<script src="js/forecast.js?v=2.2.0"></script>
+<script src="js/tomorrow.js?v=2.2.0"></script>
+<script src="js/juices.js?v=2.2.0"></script>
+<script src="js/checklist.js?v=2.2.0"></script>
+<script src="js/report.js?v=2.2.0"></script>
+<script src="js/settings.js?v=2.2.0"></script>
+<script src="js/dashboard.js?v=2.2.0"></script>
+<script src="js/main.js?v=2.2.0"></script>
 
 </body>
 </html>
