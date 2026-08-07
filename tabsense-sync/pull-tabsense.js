@@ -118,10 +118,11 @@ async function extractCategoryTable(page) {
     const trs = Array.from(table.querySelectorAll('tbody tr'));
     for (const tr of trs) {
       const tds = Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim());
-      if (tds[catIdx]) {
+      const catText = tds[catIdx] || '';
+      if (catText && !catText.includes('لا يوجد بيانات') && !catText.includes('No data available')) {
         const qtyStr = tds[qtyIdx >= 0 ? qtyIdx : 4] ? tds[qtyIdx >= 0 ? qtyIdx : 4].replace(/,/g, '') : '0';
         rows.push({
-          category: tds[catIdx],
+          category: catText,
           qty: parseFloat(qtyStr) || 0
         });
       }
@@ -242,6 +243,11 @@ async function run() {
         const existing = mappedRows.find(r => r.category === UMM_ALI_TARGET_CATEGORY);
         if (existing) existing.qty += sandwichesFromUmmAli;
         else mappedRows.push({ category: UMM_ALI_TARGET_CATEGORY, qty: sandwichesFromUmmAli });
+      }
+
+      if (!mappedRows.length) {
+        console.warn(`⚠️ تحذير: جدول مبيعات تابسنس المستخرج فارغ أو يحتوي على رسالة عدم وجود بيانات لفرع ${config.branch} في تاريخ ${iso}`);
+        throw new Error("لم يتم العثور على مبيعات في تابسنس لهذا اليوم — تأكد من التاريخ وتوفر المبيعات بالجدول");
       }
 
       // ---- 3) إرسال النتيجة لموقع برو هاوس ----
