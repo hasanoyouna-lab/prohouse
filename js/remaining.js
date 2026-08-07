@@ -84,6 +84,12 @@ function getVarianceBadge(variancePct) {
   return { label: "🔴 انحراف عالي / هدر", class: "danger", level: "critical" };
 }
 
+const MEAL_MATCHING_CATEGORIES = ["دجاج", "لحم", "بحري", "أسماك", "فطور", "ساندويتشات"];
+function isMealMatchingCategory(cat) {
+  if (!cat) return false;
+  return MEAL_MATCHING_CATEGORIES.some(m => cat.includes(m) || m.includes(cat));
+}
+
 function renderRemainingView(receivingData, salesData) {
   const view = document.getElementById("remainingView");
   if (!view) return;
@@ -119,7 +125,7 @@ function renderRemainingView(receivingData, salesData) {
   const categories = Object.keys(byCat).sort((a, b) => categoryRank(a) - categoryRank(b));
   categories.forEach(cat => byCat[cat].sort((a, b) => Number(a.sortOrder) - Number(b.sortOrder)));
 
-  // حساب المبيعات حسب التصنيف
+  // حساب المبيعات حسب التصنيف من تابسنس
   const salesMap = {};
   if (salesData && Array.isArray(salesData)) {
     salesData.forEach(r => {
@@ -132,7 +138,7 @@ function renderRemainingView(receivingData, salesData) {
       <div class="remaining-title-row">
         <div>
           <h2>📊 تقرير المتبقي والجرد والانحراف التشغيلي</h2>
-          <div class="sub-text">مقارنة المستلم بالأقسام مقابل المباع من تابسنس والجرد الفعلي</div>
+          <div class="sub-text">المطابقة مع المبيعات على مستوى إجمالي التصنيفات الرئيسية (دجاج، لحم، بحري، فطور) والجرد الفعلي</div>
         </div>
         <div class="branch-closing-wrap">
           <select id="remainingBranchSelect" onchange="onRemainingBranchChange(this.value)">
@@ -152,11 +158,12 @@ function renderRemainingView(receivingData, salesData) {
 
   categories.forEach(cat => {
     const catItems = byCat[cat];
-    const categorySoldMeals = salesMap[cat] || 0;
+    const isMealCat = isMealMatchingCategory(cat);
+    const categorySoldMeals = isMealCat ? (salesMap[cat] || 0) : 0;
+    const categoryConsumedGrams = categorySoldMeals * MEAL_WEIGHT_G; // 150g لكل وجبة
     
     let catReceivedSum = 0;
     let catActualRemainingSum = 0;
-    let catWasteSum = 0;
 
     const itemsRowsHtml = catItems.map(it => {
       const recEntry = receivingMap[it.id] || {};
@@ -169,18 +176,6 @@ function renderRemainingView(receivingData, salesData) {
       catActualRemainingSum += actualWeight;
       grandTotalActualRemainingWeight += actualWeight;
 
-      // الوجبات المباعة والمستهلكة لكل صنف
-      const soldMeals = categorySoldMeals > 0 ? (categorySoldMeals / catItems.length) : 0;
-      const vCalc = calculateItemVariance(recQty, soldMeals, actualWeight);
-
-      if (vCalc.varianceGrams < 0) {
-        catWasteSum += Math.abs(vCalc.varianceGrams);
-        grandTotalWasteGrams += Math.abs(vCalc.varianceGrams);
-      }
-
-      const vBadge = getVarianceBadge(vCalc.variancePct);
-      if (vBadge.level === "critical") highVarianceCount++;
-
       return `
         <tr class="remaining-item-row" data-item-id="${it.id}">
           <td class="cat-cell">
@@ -188,8 +183,6 @@ function renderRemainingView(receivingData, salesData) {
             <div class="unit-sub">${it.unit || 'جرام'}</div>
           </td>
           <td><strong>${recQty ? Math.round(recQty) : '—'}</strong></td>
-          <td>${Math.round(soldMeals)} وجبة</td>
-          <td>${Math.round(vCalc.consumedGrams)} جم (${Math.round(vCalc.expectedRemainingGrams)} جم متوقع)</td>
           <td>
             <input type="number" step="any" min="0" 
                    value="${remData.remainingWeight || remData.remaining || ''}" 
@@ -207,9 +200,6 @@ function renderRemainingView(receivingData, salesData) {
                    class="remaining-input sauce-input">
           </td>
           <td>
-            <span class="badge ${vBadge.class}">${vBadge.label} (${vCalc.variancePct > 0 ? '+' : ''}${vCalc.variancePct.toFixed(1)}%)</span>
-          </td>
-          <td>
             <input type="text" value="${remData.notes || ''}" 
                    placeholder="ملاحظات..." 
                    ${isClosed ? 'disabled' : ''}
@@ -220,24 +210,61 @@ function renderRemainingView(receivingData, salesData) {
       `;
     }).join("");
 
-    const categoryConsumedMeals = categorySoldMeals;
-    grandTotalSoldMeals += categorySoldMeals;
-    grandTotalConsumedMeals += categoryConsumedMeals;
+    if (isMealCat) {
+      grandTotalSoldMeals += categorySoldMeals;
+      grandTotalConsumedMeals += categorySoldMeals;
+    }
 
-    const catVariancePct = catReceivedSum > 0 ? ((catActualRemainingSum - Math.max(0, catReceivedSum - (categoryConsumedMeals * MEAL_WEIGHT_G))) / catReceivedSum) * 100 : 0;
+    // حساب الانحراف على إجمالي التصنيف بالكامل
+    const expectedRemainingGrams = isMealCat ? Math.max(0, catReceivedSum - categoryConsumedGrams) : catReceivedSum;
+    const catVarianceGrams = catActualRemainingSum - expectedRemainingGrams;
+    const catVariancePct = catReceivedSum > 0 ? (catVarianceGrams / catReceivedSum) * 100 : 0;
     const catBadge = getVarianceBadge(catVariancePct);
+
+    if (catVarianceGrams < 0) {
+      grandTotalWasteGrams += Math.abs(catVarianceGrams);
+    }
+    if (catBadge.level === "critical") highVarianceCount++;
 
     catHtml += `
       <div class="category-summary-card">
         <div class="cat-card-header" onclick="toggleCategoryGroup('${cat}')">
           <div class="cat-title-block">
             <h3>📂 ${cat}</h3>
-            <span class="badge ${catBadge.class}">${catBadge.label}</span>
+            ${isMealCat ? `<span class="badge ${catBadge.class}">${catBadge.label} (${catVariancePct > 0 ? '+' : ''}${catVariancePct.toFixed(1)}%)</span>` : ''}
           </div>
           <div class="cat-stats-summary">
             <span>المستلم: <strong>${Math.round(catReceivedSum)} جم</strong></span>
-            <span>المباع: <strong>${Math.round(categorySoldMeals)} وجبة</strong></span>
+            ${isMealCat ? `
+              <span>المباع: <strong>${Math.round(categorySoldMeals)} وجبة</strong></span>
+              <span>المستهلك: <strong>${Math.round(categoryConsumedGrams)} جم</strong></span>
+            ` : ''}
             <span>المتبقي الفعلي: <strong>${Math.round(catActualRemainingSum)} جم</strong></span>
+            <span class="toggle-icon" id="catToggle_${cat}">▼</span>
+          </div>
+        </div>
+
+        <div class="cat-card-body" id="catBody_${cat}">
+          <div class="order-table-wrap">
+            <table class="order-table">
+              <thead>
+                <tr>
+                  <th>الصنف والوحدة</th>
+                  <th>المستلم (جم)</th>
+                  <th>الوزن المتبقي الفعلي *</th>
+                  <th>الصوص المتبقي *</th>
+                  <th>الملاحظات</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsRowsHtml}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+  });
             <span class="toggle-icon" id="catToggle_${cat}">▼</span>
           </div>
         </div>

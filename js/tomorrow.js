@@ -77,8 +77,9 @@ function renderTomorrowView() {
   progressWrap.id = "tomorrowProgressWrap";
   view.appendChild(progressWrap);
 
+  const sortedItems = Items.current.slice().sort((a, b) => categoryRank(a.category) - categoryRank(b.category) || Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
   const groups = [];
-  Items.current.forEach(item => {
+  sortedItems.forEach(item => {
     const last = groups[groups.length - 1];
     if (last && last.category === item.category) last.items.push(item);
     else groups.push({ category: item.category, items: [item] });
