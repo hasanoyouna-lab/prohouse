@@ -149,7 +149,11 @@ function renderReceivingView() {
     byCat[cat].push(it);
   });
 
-  const categories = Object.keys(byCat).sort();
+  // الترتيب من شاشة الإعدادات (دجاج، لحم، بحري…) مو أبجدي — الأبجدي كان بيرفع "الحلويات"
+  // لفوق ويخالف ترتيب المطبخ اللي الموظف متعوّد عليه بباقي الشاشات.
+  const categories = Object.keys(byCat).sort((a, b) => categoryRank(a) - categoryRank(b));
+  // وداخل كل تصنيف: ترتيب الأصناف المحفوظ بالكتالوج، مو ترتيب وصولها من الشيت
+  categories.forEach(cat => byCat[cat].sort((a, b) => Number(a.sortOrder) - Number(b.sortOrder)));
 
   if (!categories.length) {
     html += `<div class="empty-state">لا توجد أصناف مسجلة لهذا الفرع.</div>`;
@@ -158,7 +162,23 @@ function renderReceivingView() {
   }
 
   categories.forEach(cat => {
-    html += `<div class="cat-title">📁 ${cat}</div>`;
+    // تصنيف قابل للطي: بشاشة فيها 37 صنف، الموظف بده يفتح تصنيف واحد ويشتغل عليه
+    // بدل ما يلف الشاشة كلها. نفس سلوك شاشة الاستلام القديمة اللي الموظفين متعوّدين عليه.
+    const done = byCat[cat].filter(it => {
+      const r = (currentReceivingData[it.id] || {}).received;
+      return r !== "" && r !== null && r !== undefined;
+    }).length;
+
+    html += `
+      <div class="category-section${receivingCollapsed[cat] ? " collapsed" : ""}" data-cat="${cat}">
+        <div class="category-header" onclick="toggleReceivingCategory('${String(cat).replace(/'/g, "\\'")}')">
+          <span class="cat-label">📁 ${cat}</span>
+          <span style="display:flex;align-items:center;">
+            <span class="cat-count">${done}/${byCat[cat].length}</span>
+            <span class="chevron">▾</span>
+          </span>
+        </div>
+        <div class="category-body"><div>`;
 
     byCat[cat].forEach(it => {
       const ord = currentReceivingOrdered[it.id] !== undefined ? currentReceivingOrdered[it.id] : "";
@@ -207,17 +227,53 @@ function renderReceivingView() {
             </div>
           </div>
 
+          ${isMealCategory(it.category) ? `
+          <div class="badges" style="margin-top:0;">
+            <span class="badge neutral" id="recmeals-${it.id}">🍽 عدد الوجبات: ${mealsCount(rec) || "—"}</span>
+          </div>` : ""}
+
           <div class="notes-row">
-            <input type="text" value="${recData.notes || ''}" 
-                   placeholder="ملاحظات الاستلام (مثال: نقص من المطبخ، صنف متأخر...)" 
+            <input type="text" value="${recData.notes || ''}"
+                   placeholder="ملاحظات الاستلام (مثال: نقص من المطبخ، صنف متأخر...)"
                    oninput="onReceivingNotesChange('${it.id}', this.value)">
           </div>
         </div>
       `;
     });
+
+    html += `</div></div></div>`; // إغلاق category-body ← الغلاف الداخلي ← category-section
   });
 
   view.innerHTML = html;
+}
+
+// عدّاد "٣/٨" على رأس التصنيف — يتحدّث بدون إعادة رسم الشاشة كلها
+function updateReceivingCategoryCount(itemId) {
+  const item = Items.current.find(it => it.id === itemId);
+  if (!item) return;
+  const cat = item.category || "عام";
+  const section = document.querySelector(`.category-section[data-cat="${cat}"]`);
+  const counter = section && section.querySelector(".cat-count");
+  if (!counter) return;
+
+  const inCat = Items.current.filter(it => {
+    if ((it.category || "عام") !== cat) return false;
+    const b = itemBranches(it);
+    return !b.length || b.includes(currentReceivingBranch);
+  });
+  const done = inCat.filter(it => {
+    const r = (currentReceivingData[it.id] || {}).received;
+    return r !== "" && r !== null && r !== undefined;
+  }).length;
+  counter.textContent = `${done}/${inCat.length}`;
+}
+
+// الحالة محفوظة برا دالة الرسم حتى التصنيفات المطوية تضل مطوية بعد كل إعادة رسم
+let receivingCollapsed = {};
+function toggleReceivingCategory(cat) {
+  receivingCollapsed[cat] = !receivingCollapsed[cat];
+  const section = document.querySelector(`.category-section[data-cat="${cat}"]`);
+  if (section) section.classList.toggle("collapsed", !!receivingCollapsed[cat]);
 }
 
 function onReceivingBranchChange(branch) {
@@ -250,7 +306,13 @@ function updateReceivingItemCardUI(itemId) {
   const diff = (recVal !== "" && recVal !== null) ? (recNum - ordNum) : null;
   const status = computeReceivingItemStatus(recVal, ordVal);
 
-  const badge = card.querySelector(".badge");
+  // عدد الوجبات وعدّاد التصنيف بيتحدثوا مع الكتابة — بدون هيك بيضلوا على القيمة الأولى
+  // لحد ما تنعاد الشاشة كلها.
+  const mealsEl = document.getElementById("recmeals-" + itemId);
+  if (mealsEl) mealsEl.textContent = "🍽 عدد الوجبات: " + (mealsCount(recVal) || "—");
+  updateReceivingCategoryCount(itemId);
+
+  const badge = card.querySelector(".item-header-row .badge");
   if (badge) {
     badge.textContent = status;
     badge.className = "badge " + (status === "مكتمل" ? "ok" : (status === "ناقص" ? "warn" : (status === "زائد" ? "surplus" : "neutral")));

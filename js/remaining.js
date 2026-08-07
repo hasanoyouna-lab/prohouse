@@ -115,7 +115,9 @@ function renderRemainingView(receivingData, salesData) {
     byCat[cat].push(it);
   });
 
-  const categories = Object.keys(byCat).sort();
+  // نفس قاعدة باقي الشاشات: ترتيب التصنيفات من الإعدادات مو أبجدي، والأصناف بترتيب الكتالوج
+  const categories = Object.keys(byCat).sort((a, b) => categoryRank(a) - categoryRank(b));
+  categories.forEach(cat => byCat[cat].sort((a, b) => Number(a.sortOrder) - Number(b.sortOrder)));
 
   // حساب المبيعات حسب التصنيف
   const salesMap = {};
