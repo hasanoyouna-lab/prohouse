@@ -265,7 +265,6 @@ function doGet(e) {
         data = getJuiceReport(e.parameter.start, e.parameter.end, e.parameter.branch);
         break;
       case 'getSalesByCategory':
-        if (employee.role === 'employee') throw new Error('غير مصرح');
         requireBranchAccess_(employee, e.parameter.branch);
         data = getSalesByCategory(e.parameter.start, e.parameter.end, e.parameter.branch);
         break;

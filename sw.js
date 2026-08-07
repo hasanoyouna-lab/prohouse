@@ -1,7 +1,7 @@
-// Service Worker: Pro House Operations Center v4.1.3
+// Service Worker: Pro House Operations Center v4.1.5
 // يخزّن هيكل التطبيق (HTML/CSS/JS) محلياً لدعم العمل أوفلاين التام للموظفين والفروع.
 
-const CACHE_NAME = "prohouse-shell-v4.1.3";
+const CACHE_NAME = "prohouse-shell-v4.1.5";
 
 // التخزين المسبق ضروري: بدونه أول فتحة بدون نت بتفشل كلياً لأنه ما في شي مخزّن أصلاً.
 // أي ملف جديد ينضاف لـ index.html لازم ينضاف هون كمان، وإلا التطبيق بينكسر أوفلاين بس.
@@ -21,7 +21,7 @@ const SHELL_FILES = [
   "./js/waste.js",
   "./js/users.js",
   "./js/audit.js",
-  "./js/shared.js",
+  "./js/entry.js",
   "./js/forecast.js",
   "./js/tomorrow.js",
   "./js/juices.js",

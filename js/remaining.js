@@ -18,33 +18,35 @@ async function loadRemainingData(date, branch) {
   const view = document.getElementById("remainingView");
   if (view) view.innerHTML = '<div class="loader">جاري تجميع تقرير المتبقي والجرد والانحراف…</div>';
 
-  await Items.load();
+  try {
+    await Items.load();
 
-  // 1) جلب تقرير الاستلام لنفس اليوم والفرع
-  const receivingData = await Sync.get("getDay", { date: currentRemainingDate, branch: currentRemainingBranch }, "day:" + currentRemainingDate + ":" + currentRemainingBranch);
-  
-  // 2) جلب مبيعات تابسنس لنفس اليوم والفرع (مبيعات التصنيفات والمنتجات)
-  const salesData = await Sync.get("getSalesByCategory", { start: currentRemainingDate, end: currentRemainingDate, branch: currentRemainingBranch }, "tabsense:" + currentRemainingDate + ":" + currentRemainingBranch);
+    const [receivingData, salesData, remainingData] = await Promise.all([
+      Sync.get("getDay", { date: currentRemainingDate, branch: currentRemainingBranch }, "day:" + currentRemainingDate + ":" + currentRemainingBranch).catch(() => null),
+      Sync.get("getSalesByCategory", { start: currentRemainingDate, end: currentRemainingDate, branch: currentRemainingBranch }, "tabsense:" + currentRemainingDate + ":" + currentRemainingBranch).catch(() => null),
+      Sync.get("getRemainingReport", { date: currentRemainingDate, branch: currentRemainingBranch }, "remaining:" + currentRemainingDate + ":" + currentRemainingBranch).catch(() => null)
+    ]);
 
-  // 3) جلب تقرير المتبقي المحفوظ سابقاً
-  const remainingData = await Sync.get("getRemainingReport", { date: currentRemainingDate, branch: currentRemainingBranch }, "remaining:" + currentRemainingDate + ":" + currentRemainingBranch);
+    currentRemainingData = {};
+    currentRemainingMeta = { isClosed: false, closedBy: "", closedAt: "" };
 
-  currentRemainingData = {};
-  currentRemainingMeta = { isClosed: false, closedBy: "", closedAt: "" };
+    if (remainingData) {
+      if (remainingData.meta) currentRemainingMeta = remainingData.meta;
+      (remainingData.items || []).forEach(it => {
+        currentRemainingData[it.itemId] = {
+          remaining: it.remaining !== undefined && it.remaining !== null ? String(it.remaining) : "",
+          remainingWeight: it.remainingWeight !== undefined && it.remainingWeight !== null ? String(it.remainingWeight) : "",
+          remainingSauce: it.remainingSauce !== undefined && it.remainingSauce !== null ? String(it.remainingSauce) : "",
+          notes: it.notes || ""
+        };
+      });
+    }
 
-  if (remainingData) {
-    if (remainingData.meta) currentRemainingMeta = remainingData.meta;
-    (remainingData.items || []).forEach(it => {
-      currentRemainingData[it.itemId] = {
-        remaining: it.remaining !== undefined && it.remaining !== null ? String(it.remaining) : "",
-        remainingWeight: it.remainingWeight !== undefined && it.remainingWeight !== null ? String(it.remainingWeight) : "",
-        remainingSauce: it.remainingSauce !== undefined && it.remainingSauce !== null ? String(it.remainingSauce) : "",
-        notes: it.notes || ""
-      };
-    });
+    renderRemainingView(receivingData, salesData);
+  } catch (err) {
+    console.error("loadRemainingData error:", err);
+    renderRemainingView(null, null);
   }
-
-  renderRemainingView(receivingData, salesData);
 }
 
 function calculateCategorySales(salesRows, categoryName) {
