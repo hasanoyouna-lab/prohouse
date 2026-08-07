@@ -238,6 +238,8 @@ async function loadTomorrowOrder(dateStr) {
   document.getElementById("tomorrowView").innerHTML = '<div class="loader">جاري التحميل وتحليل الذكاء الاصطناعي…</div>';
   currentTomorrowOrder = {};
 
+  await Items.load();
+
   const cacheKey = "tomorrow:" + dateStr + ":" + currentTomorrowBranch;
   const data = await Sync.get("getTomorrowOrder", { date: dateStr, branch: currentTomorrowBranch }, cacheKey, applyTomorrowData);
   applyTomorrowData(data);
