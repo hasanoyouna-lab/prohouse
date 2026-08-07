@@ -21,7 +21,7 @@ const SHELL_FILES = [
   "./js/waste.js",
   "./js/users.js",
   "./js/audit.js",
-  "./js/entry.js",
+  "./js/shared.js",
   "./js/forecast.js",
   "./js/tomorrow.js",
   "./js/juices.js",

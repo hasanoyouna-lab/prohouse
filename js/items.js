@@ -51,7 +51,7 @@ const Items = (() => {
   return { load, byId, save, remove, newId, get current() { return current; }, setRenderer };
 })();
 
-// يعتمد على branchList() المعرّفة بـ js/entry.js (يشتغل صح لأنه بينادى وقت التشغيل بعد ما كل الملفات تحمّلت)
+// يعتمد على branchList() المعرّفة بـ js/shared.js (بينحمّل قبل هالملف)
 function itemBranches(item) {
   return (item.branches || "").split(",").map(s => s.trim()).filter(Boolean);
 }

@@ -265,34 +265,6 @@ function renderRemainingView(receivingData, salesData) {
       </div>
     `;
   });
-            <span class="toggle-icon" id="catToggle_${cat}">▼</span>
-          </div>
-        </div>
-
-        <div class="cat-card-body" id="catBody_${cat}">
-          <div class="order-table-wrap">
-            <table class="order-table">
-              <thead>
-                <tr>
-                  <th>الصنف والوحدة</th>
-                  <th>المستلم (جم)</th>
-                  <th>المباع (وجبة)</th>
-                  <th>المستهلك والمتوقع</th>
-                  <th>الوزن المتبقي الفعلي *</th>
-                  <th>الصوص المتبقي *</th>
-                  <th>الانحراف والهدر</th>
-                  <th>الملاحظات</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${itemsRowsHtml}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    `;
-  });
 
   // إضافة كروت KPI الهيدر القيادية
   html += `

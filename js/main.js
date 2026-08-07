@@ -8,7 +8,6 @@ const TAB_ROLE_ACCESS = {
   inspection: ["owner", "manager", "chef", "employee"],
   receiving: ["owner", "manager", "chef", "employee"],
   remaining: ["owner", "manager", "chef", "employee"],
-  entry: ["owner", "manager", "chef", "employee"],
   tomorrow: ["owner", "manager", "chef", "employee"],
   juices: ["owner", "manager", "employee"],
   checklist: ["owner", "manager", "chef", "employee"],
@@ -49,7 +48,7 @@ function setActiveTab(tab) {
 
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
 
-  const views = ["dashboardView", "branchesView", "openingView", "closingView", "inspectionView", "receivingView", "remainingView", "entryView", "tomorrowView", "juicesView", "checklistView", "wasteView", "reportContainer", "itemsView", "usersView", "auditView", "settingsView"];
+  const views = ["dashboardView", "branchesView", "openingView", "closingView", "inspectionView", "receivingView", "remainingView", "tomorrowView", "juicesView", "checklistView", "wasteView", "reportContainer", "itemsView", "usersView", "auditView", "settingsView"];
   views.forEach(vId => {
     const el = document.getElementById(vId);
     if (el) el.classList.add("hidden");
@@ -64,7 +63,6 @@ function setActiveTab(tab) {
   if (recDateBar) recDateBar.classList.toggle("hidden", tab !== "receiving");
   if (remDateBar) remDateBar.classList.toggle("hidden", tab !== "remaining");
 
-  document.getElementById("entryDateBar").classList.toggle("hidden", tab !== "entry");
   document.getElementById("tomorrowDateBar").classList.toggle("hidden", tab !== "tomorrow");
   document.getElementById("juiceDateBar").classList.toggle("hidden", tab !== "juices");
   document.getElementById("checklistDateBar").classList.toggle("hidden", tab !== "checklist");
@@ -74,7 +72,6 @@ function setActiveTab(tab) {
   if (saveBarReceiving) saveBarReceiving.classList.toggle("hidden", tab !== "receiving" || Auth.isViewOnlyEntry());
   if (saveBarRemaining) saveBarRemaining.classList.toggle("hidden", tab !== "remaining" || Auth.isViewOnlyEntry());
 
-  document.getElementById("saveBarEntry").classList.toggle("hidden", tab !== "entry" || Auth.isViewOnlyEntry());
   document.getElementById("saveBarTomorrow").classList.toggle("hidden", tab !== "tomorrow" || Auth.isViewOnlyTomorrow());
   document.getElementById("saveBarJuices").classList.toggle("hidden", tab !== "juices" || Auth.isViewOnlyEntry());
   document.getElementById("saveBarChecklist").classList.toggle("hidden", tab !== "checklist" || Auth.isViewOnlyEntry());
@@ -219,7 +216,6 @@ async function startApp() {
   initReceivingTab();
   initRemainingTab();
   initDashboardTab();
-  initEntryTab();
   initTomorrowTab();
   if (tabAllowed("juices")) initJuicesTab();
   initChecklistTab();
