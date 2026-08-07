@@ -240,7 +240,7 @@ async function renderDashboard() {
     `;
     card.addEventListener("click", () => {
       Branch.set(s.branch);
-      document.querySelector('.tab-btn[data-tab="entry"]').click();
+      setActiveTab("receiving");
     });
     grid.appendChild(card);
   });

@@ -78,7 +78,7 @@ async function renderBranchesHubView() {
 function selectBranchControlCenter(branch) {
   Branch.set(branch);
   currentBranchHubSelected = branch;
-  showBranchControlCenterModal(branch);
+  setActiveTab("receiving");
 }
 
 async function showBranchControlCenterModal(branch) {
