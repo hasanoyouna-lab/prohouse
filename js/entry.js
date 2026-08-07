@@ -21,15 +21,8 @@ function thresholdFrom(key, fallback) {
   return isNaN(v) ? fallback : v;
 }
 
-function todayStr() {
-  const d = new Date();
-  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
-}
-function addDaysStr(dateStr, delta) {
-  const d = new Date(dateStr + "T00:00:00");
-  d.setDate(d.getDate() + delta);
-  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
-}
+// todayStr و addDaysStr انتقلوا لـ js/config.js — بينحمّل أول، والوحدات التانية بتناديهم
+// وقت التحميل قبل ما يوصل الدور لهاد الملف.
 
 let currentEntryDate = todayStr();
 let currentEntry = {};   // itemId -> {received, returned, notes, cookName, confirmed}
