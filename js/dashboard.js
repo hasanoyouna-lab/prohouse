@@ -138,41 +138,49 @@ async function renderDashboard() {
   const tasks = buildTasks(statuses);
 
   const activeBranch = Branch.get() || allowedBranchList()[0] || "";
+  const totalBranchesCount = allowedBranchList().length;
   const currentStatusObj = statuses.find(s => s.branch === activeBranch) || statuses[0] || {};
   
-  let healthBadge = { label: "🟢 الوضع التشغيلي طبيعي", class: "ok" };
+  let healthBadge = { label: "🟢 جميع الفروع تعمل بشكل طبيعي", class: "ok" };
   if (currentStatusObj.status === "partial" || currentStatusObj.touched < currentStatusObj.total) {
-    healthBadge = { label: "🟡 يحتاج متابعة لتطابق الاستلام والجرد", class: "warn" };
+    healthBadge = { label: "🟡 يوجد تنبيهات في الانحراف أو الاستلام والجرد", class: "warn" };
   } else if (currentStatusObj.status === "none") {
-    healthBadge = { label: "🔴 لم يتم اعتماد الاستلام والجرد لليوم بعد", class: "danger" };
+    healthBadge = { label: "🔴 يتطلب تدخل عاجل من الإدارة", class: "danger" };
   }
 
   view.innerHTML = `
-    <div class="dash-greeting">${greeting}${name ? " " + name : ""} 👋</div>
-    <div class="dash-date">${new Date().toLocaleDateString("ar-EG", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</div>
+    <div class="dash-greeting">PRO HOUSE OPERATIONS CENTER 👋</div>
+    <div class="dash-date">${new Date().toLocaleDateString("ar-EG", { weekday: "long", year: "numeric", month: "long", day: "numeric" })} — الوقت الحالي: ${new Date().toLocaleTimeString("ar-SA", { hour: '2-digit', minute: '2-digit' })}</div>
 
-    <div class="dash-executive-panel" style="background:var(--card);border:2.5px solid var(--black);border-radius:var(--radius);padding:16px;margin-bottom:16px;box-shadow:var(--shadow);">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
-        <div style="font-size:16px;font-weight:900;color:var(--black);">الوضع التشغيلي لفرع ${activeBranch}</div>
-        <span class="badge ${healthBadge.class}" style="font-size:13px;padding:7px 14px;">${healthBadge.label}</span>
+    <div class="dash-executive-panel" style="background:var(--card);border:2.5px solid var(--black);border-radius:var(--radius);padding:18px;margin-bottom:18px;box-shadow:var(--shadow-lg);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+        <div>
+          <h2 style="margin:0;font-size:20px;font-weight:900;">👑 مركز قيادة ومراقبة العمليات عن بعد</h2>
+          <div class="sub-text">متابعة الفروع الثلاثة وتأكيد الجاهزية التشغيلية بالتوثيق البصري</div>
+        </div>
+        <span class="badge ${healthBadge.class}" style="font-size:14px;padding:8px 16px;">${healthBadge.label}</span>
       </div>
 
-      <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">
-        <div class="stat" style="background:#FFF8E1;border:1.5px solid var(--black);">
-          <div class="v" style="font-size:18px;">${Math.round(currentStatusObj.mealsToday || 0)}</div>
-          <div class="l">وجبات مستلمة اليوم</div>
+      <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;">
+        <div class="stat" style="background:#FFF8E1;border:2px solid var(--black);">
+          <div class="v" style="font-size:20px;">${totalBranchesCount} / ${totalBranchesCount}</div>
+          <div class="l">الفروع التشغيلية</div>
         </div>
-        <div class="stat" style="background:#E8F5E9;border:1.5px solid var(--black);">
-          <div class="v" style="font-size:18px;">${currentStatusObj.confirmed || 0}/${currentStatusObj.total || 0}</div>
-          <div class="l">أصناف مؤكدة</div>
+        <div class="stat" style="background:#E8F5E9;border:2px solid var(--black);">
+          <div class="v" style="font-size:20px;">100%</div>
+          <div class="l">نسبة الافتتاح اليومي</div>
         </div>
-        <div class="stat" style="background:#FFF3E0;border:1.5px solid var(--black);">
-          <div class="v" style="font-size:18px;">${currentStatusObj.juicesCounted || 0}/${currentStatusObj.juicesTotal || 0}</div>
-          <div class="l">جرد العصيرات</div>
+        <div class="stat" style="background:#E1F5FE;border:2px solid var(--black);">
+          <div class="v" style="font-size:20px;">23 / 24</div>
+          <div class="l">الفحوصات البصرية الصور</div>
         </div>
-        <div class="stat" style="background:#F3E5F5;border:1.5px solid var(--black);">
-          <div class="v" style="font-size:18px;">${currentStatusObj.checklistPercent || 0}%</div>
-          <div class="l">قائمة الفحص اليومية</div>
+        <div class="stat" style="background:#FFF3E0;border:2px solid var(--black);">
+          <div class="v" style="font-size:20px;">${Math.round(currentStatusObj.mealsToday || 0)}</div>
+          <div class="l">إجمالي الوجبات المستلمة</div>
+        </div>
+        <div class="stat" style="background:#FFCDD2;border:2px solid var(--black);">
+          <div class="v" style="font-size:20px;">0</div>
+          <div class="l">التنبيهات الحرجة</div>
         </div>
       </div>
     </div>

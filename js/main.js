@@ -2,14 +2,21 @@
 
 const TAB_ROLE_ACCESS = {
   dashboard: ["owner", "manager", "chef", "employee"],
+  branches: ["owner", "manager", "chef", "employee"],
+  opening: ["owner", "manager", "chef", "employee"],
+  closing: ["owner", "manager", "chef", "employee"],
+  inspection: ["owner", "manager", "chef", "employee"],
   receiving: ["owner", "manager", "chef", "employee"],
   remaining: ["owner", "manager", "chef", "employee"],
   entry: ["owner", "manager", "chef", "employee"],
   tomorrow: ["owner", "manager", "chef", "employee"],
   juices: ["owner", "manager", "employee"],
   checklist: ["owner", "manager", "chef", "employee"],
+  waste: ["owner", "manager", "chef", "employee"],
   report: ["owner", "manager", "chef"],
   items: ["owner", "manager", "employee"],
+  users: ["owner", "manager"],
+  audit: ["owner", "manager"],
   settings: ["owner"]
 };
 
@@ -32,25 +39,25 @@ function closeMobileSidebar() {
   if (backdrop) backdrop.classList.remove("active");
 }
 
+function setActiveSubTab(subTab) {
+  setActiveTab(subTab);
+}
+
 function setActiveTab(tab) {
   if (!tabAllowed(tab)) tab = "dashboard";
   closeMobileSidebar();
 
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
 
-  const receivingView = document.getElementById("receivingView");
-  const remainingView = document.getElementById("remainingView");
-  if (receivingView) receivingView.classList.toggle("hidden", tab !== "receiving");
-  if (remainingView) remainingView.classList.toggle("hidden", tab !== "remaining");
+  const views = ["dashboardView", "branchesView", "openingView", "closingView", "inspectionView", "receivingView", "remainingView", "entryView", "tomorrowView", "juicesView", "checklistView", "wasteView", "reportContainer", "itemsView", "usersView", "auditView", "settingsView"];
+  views.forEach(vId => {
+    const el = document.getElementById(vId);
+    if (el) el.classList.add("hidden");
+  });
 
-  document.getElementById("dashboardView").classList.toggle("hidden", tab !== "dashboard");
-  document.getElementById("entryView").classList.toggle("hidden", tab !== "entry");
-  document.getElementById("tomorrowView").classList.toggle("hidden", tab !== "tomorrow");
-  document.getElementById("juicesView").classList.toggle("hidden", tab !== "juices");
-  document.getElementById("checklistView").classList.toggle("hidden", tab !== "checklist");
-  document.getElementById("reportContainer").classList.toggle("hidden", tab !== "report");
-  document.getElementById("itemsView").classList.toggle("hidden", tab !== "items");
-  document.getElementById("settingsView").classList.toggle("hidden", tab !== "settings");
+  const activeViewId = tab === "report" ? "reportContainer" : (tab + "View");
+  const activeEl = document.getElementById(activeViewId);
+  if (activeEl) activeEl.classList.remove("hidden");
 
   const recDateBar = document.getElementById("receivingDateBar");
   const remDateBar = document.getElementById("remainingDateBar");
@@ -72,9 +79,16 @@ function setActiveTab(tab) {
   document.getElementById("saveBarJuices").classList.toggle("hidden", tab !== "juices" || Auth.isViewOnlyEntry());
   document.getElementById("saveBarChecklist").classList.toggle("hidden", tab !== "checklist" || Auth.isViewOnlyEntry());
 
+  if (tab === "dashboard") { renderDashboard(); }
+  if (tab === "branches") { renderBranchesHubView(); }
+  if (tab === "opening") { renderOpeningView(); }
+  if (tab === "closing") { renderClosingView(); }
+  if (tab === "inspection") { renderInspectionGalleryView(); }
   if (tab === "receiving") { loadReceivingData(currentReceivingDate, currentReceivingBranch); }
   if (tab === "remaining") { loadRemainingData(currentRemainingDate, currentRemainingBranch); }
-  if (tab === "dashboard") { renderDashboard(); }
+  if (tab === "waste") { loadWasteData(currentWasteDate, currentWasteBranch); }
+  if (tab === "users") { renderUsersView(); }
+  if (tab === "audit") { renderAuditView(); }
   if (tab === "checklist") { renderChecklistView(); }
   if (tab === "report") {
     loadReportLibs().then(() => {

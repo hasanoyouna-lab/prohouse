@@ -1,7 +1,7 @@
-// Service Worker: يخزّن هيكل التطبيق (HTML/CSS/JS) محلياً حتى يفتح بدون إنترنت نهائياً.
-// تحديث شامل v40 — يفصل تقرير الاستلام عن تقرير المتبقي والجرد والانحراف التشغيلي.
+// Service Worker: Pro House Operations Center v4.0.0
+// يخزّن هيكل التطبيق (HTML/CSS/JS) محلياً لدعم العمل أوفلاين التام للموظفين والفروع.
 
-const CACHE_NAME = "prohouse-shell-v40";
+const CACHE_NAME = "prohouse-shell-v4.0.0";
 
 function isAppCode(url) {
   return url.pathname.endsWith(".html") || url.pathname.endsWith(".js") ||

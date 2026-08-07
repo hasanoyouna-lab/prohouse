@@ -75,6 +75,26 @@ if ('serviceWorker' in navigator) {
         <span class="nav-icon">🏠</span>
         <span class="nav-text">الرئيسية</span>
       </button>
+
+      <div class="nav-group-title">🏪 إدارة الفروع والعمليات</div>
+      <button class="tab-btn nav-item" data-tab="branches">
+        <span class="nav-icon">🏪</span>
+        <span class="nav-text">حالة الفروع</span>
+      </button>
+      <button class="tab-btn nav-item sub-item" data-tab="opening">
+        <span class="nav-icon">🌅</span>
+        <span class="nav-text">افتتاح الفرع</span>
+      </button>
+      <button class="tab-btn nav-item sub-item" data-tab="closing">
+        <span class="nav-icon">🔒</span>
+        <span class="nav-text">إغلاق الفرع</span>
+      </button>
+      <button class="tab-btn nav-item sub-item" data-tab="inspection">
+        <span class="nav-icon">📷</span>
+        <span class="nav-text">المراقبة الميدانية</span>
+      </button>
+
+      <div class="nav-group-title">📦 طلبية اليوم (الاستلام والمتبقي)</div>
       <button class="tab-btn nav-item" data-tab="receiving">
         <span class="nav-icon">📦</span>
         <span class="nav-text">تقرير الاستلام</span>
@@ -83,10 +103,8 @@ if ('serviceWorker' in navigator) {
         <span class="nav-icon">📊</span>
         <span class="nav-text">تقرير المتبقي والجرد</span>
       </button>
-      <button class="tab-btn nav-item" data-tab="entry">
-        <span class="nav-icon">📝</span>
-        <span class="nav-text">طلبية اليوم</span>
-      </button>
+
+      <div class="nav-group-title">📋 التشغيل والمبيعات</div>
       <button class="tab-btn nav-item" data-tab="tomorrow">
         <span class="nav-icon">📦</span>
         <span class="nav-text">طلبية الغد</span>
@@ -99,13 +117,27 @@ if ('serviceWorker' in navigator) {
         <span class="nav-icon">📋</span>
         <span class="nav-text">قائمة الفحص</span>
       </button>
+      <button class="tab-btn nav-item" data-tab="waste">
+        <span class="nav-icon">⚠️</span>
+        <span class="nav-text">سجل الهدر والاقطاع</span>
+      </button>
       <button class="tab-btn nav-item" data-tab="report">
         <span class="nav-icon">📈</span>
-        <span class="nav-text">التقارير والمبيعات</span>
+        <span class="nav-text">التقارير والتحليلات</span>
       </button>
       <button class="tab-btn nav-item" data-tab="items">
         <span class="nav-icon">🍽️</span>
         <span class="nav-text">إدارة الأصناف</span>
+      </button>
+
+      <div class="nav-group-title">👥 النظام والأمان</div>
+      <button class="tab-btn nav-item" data-tab="users">
+        <span class="nav-icon">👥</span>
+        <span class="nav-text">المستخدمون والصلاحيات</span>
+      </button>
+      <button class="tab-btn nav-item" data-tab="audit">
+        <span class="nav-icon">📜</span>
+        <span class="nav-text">حالة النظام والأنشطة</span>
       </button>
       <button class="tab-btn nav-item" data-tab="settings">
         <span class="nav-icon">⚙️</span>
@@ -131,7 +163,7 @@ if ('serviceWorker' in navigator) {
     <header class="app-topbar">
       <button class="mobile-toggle-btn" id="mobileToggleBtn" aria-label="القائمة الجانبية">☰ القائمة</button>
       <div class="topbar-title-block">
-        <div class="topbar-brand brand-name">Pro House</div>
+        <div class="topbar-brand brand-name">Pro House Operations Center</div>
       </div>
       <div class="topbar-right">
         <button class="sync-badge" id="syncBadge" title="حالة المزامنة">🔄 متصل</button>
@@ -163,19 +195,17 @@ if ('serviceWorker' in navigator) {
       <div id="offlineBanner" class="offline-banner hidden">غير متصل بالإنترنت — بتشتغل ببيانات محفوظة محلياً وبتتزامن لما يرجع النت</div>
 
       <div id="dashboardView" class="view"></div>
-
+      <div id="branchesView" class="view hidden"></div>
+      <div id="openingView" class="view hidden"></div>
+      <div id="closingView" class="view hidden"></div>
+      <div id="inspectionView" class="view hidden"></div>
       <div id="receivingView" class="view hidden"></div>
-
       <div id="remainingView" class="view hidden"></div>
-
       <div id="entryView" class="view hidden"></div>
-
       <div id="tomorrowView" class="view hidden"></div>
-
       <div id="juicesView" class="view hidden"></div>
-
       <div id="checklistView" class="view hidden"></div>
-
+      <div id="wasteView" class="view hidden"></div>
       <div id="reportContainer" class="view hidden">
         <div class="toolbar">
           <select id="reportType">
@@ -224,7 +254,8 @@ if ('serviceWorker' in navigator) {
       </div>
 
       <div id="itemsView" class="view hidden"></div>
-
+      <div id="usersView" class="view hidden"></div>
+      <div id="auditView" class="view hidden"></div>
       <div id="settingsView" class="view hidden"></div>
     </main>
   </div>
@@ -262,21 +293,29 @@ if ('serviceWorker' in navigator) {
 
 <div class="toast" id="toast"></div>
 
-<script src="js/config.js?v=3.1.0"></script>
-<script src="js/auth.js?v=3.1.0"></script>
-<script src="js/sync.js?v=3.1.0"></script>
-<script src="js/items.js?v=3.1.0"></script>
-<script src="js/receiving.js?v=3.1.0"></script>
-<script src="js/remaining.js?v=3.1.0"></script>
-<script src="js/entry.js?v=3.1.0"></script>
-<script src="js/forecast.js?v=3.1.0"></script>
-<script src="js/tomorrow.js?v=3.1.0"></script>
-<script src="js/juices.js?v=3.1.0"></script>
-<script src="js/checklist.js?v=3.1.0"></script>
-<script src="js/report.js?v=3.1.0"></script>
-<script src="js/settings.js?v=3.1.0"></script>
-<script src="js/dashboard.js?v=3.1.0"></script>
-<script src="js/main.js?v=3.1.0"></script>
+<script src="js/config.js?v=4.0.0"></script>
+<script src="js/auth.js?v=4.0.0"></script>
+<script src="js/sync.js?v=4.0.0"></script>
+<script src="js/items.js?v=4.0.0"></script>
+<script src="js/camera.js?v=4.0.0"></script>
+<script src="js/branches.js?v=4.0.0"></script>
+<script src="js/receiving.js?v=4.0.0"></script>
+<script src="js/remaining.js?v=4.0.0"></script>
+<script src="js/waste.js?v=4.0.0"></script>
+<script src="js/users.js?v=4.0.0"></script>
+<script src="js/audit.js?v=4.0.0"></script>
+<script src="js/entry.js?v=4.0.0"></script>
+<script src="js/forecast.js?v=4.0.0"></script>
+<script src="js/tomorrow.js?v=4.0.0"></script>
+<script src="js/juices.js?v=4.0.0"></script>
+<script src="js/checklist.js?v=4.0.0"></script>
+<script src="js/report.js?v=4.0.0"></script>
+<script src="js/settings.js?v=4.0.0"></script>
+<script src="js/dashboard.js?v=4.0.0"></script>
+<script src="js/main.js?v=4.0.0"></script>
+
+</body>
+</html>
 
 </body>
 </html>
