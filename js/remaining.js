@@ -212,6 +212,12 @@ function renderRemainingView(receivingData, salesData) {
       `;
     }).join("");
 
+    const filledCount = catItems.filter(it => {
+      const remData = currentRemainingData[it.id] || {};
+      const val = remData.remainingWeight || remData.remaining;
+      return val !== "" && val !== null && val !== undefined;
+    }).length;
+
     if (isMealCat) {
       grandTotalSoldMeals += categorySoldMeals;
       grandTotalConsumedMeals += categorySoldMeals;
@@ -234,14 +240,15 @@ function renderRemainingView(receivingData, salesData) {
           <div class="cat-title-block">
             <h3>📂 ${cat}</h3>
             ${isMealCat ? `<span class="badge ${catBadge.class}">${catBadge.label} (${catVariancePct > 0 ? '+' : ''}${catVariancePct.toFixed(1)}%)</span>` : ''}
+            <span class="badge neutral" style="margin-right:6px;">${filledCount}/${catItems.length} مكتمل</span>
           </div>
           <div class="cat-stats-summary">
-            <span>المستلم: <strong>${Math.round(catReceivedSum)} جم</strong></span>
+            <span>المستلم: <strong>${Math.round(catReceivedSum)} جم ${isMealCat && catReceivedSum > 0 ? `(${mealsCount(catReceivedSum)} وجبة)` : ''}</strong></span>
             ${isMealCat ? `
               <span>المباع: <strong>${Math.round(categorySoldMeals)} وجبة</strong></span>
               <span>المستهلك: <strong>${Math.round(categoryConsumedGrams)} جم</strong></span>
             ` : ''}
-            <span>المتبقي الفعلي: <strong>${Math.round(catActualRemainingSum)} جم</strong></span>
+            <span>المتبقي الفعلي: <strong>${Math.round(catActualRemainingSum)} جم ${isMealCat && catActualRemainingSum > 0 ? `(${mealsCount(catActualRemainingSum)} وجبة)` : ''}</strong></span>
             <span class="toggle-icon" id="catToggle_${cat}">▼</span>
           </div>
         </div>
