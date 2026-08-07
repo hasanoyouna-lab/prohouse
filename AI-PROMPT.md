@@ -35,10 +35,10 @@
 
 # الموقع والكود
 
-**الموقع الحي:** `https://hasanoyouna-lab.github.io/prohouse/`
+**الموقع الحي:** `https://prohouse-official.github.io/prohouse/`
 محمي برقم سري فلن ترى منه إلا شاشة الدخول، لكن كل ملفات الواجهة مفتوحة أدناه.
 
-**المستودع:** `https://github.com/hasanoyouna-lab/prohouse`
+**المستودع:** `https://github.com/prohouse-official/prohouse`
 
 ## الملفات — افتحها بنفسك
 
@@ -46,40 +46,40 @@
 
 **الأساس والبنية**
 
-1. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/index.html` — ٣٠٩ سطر — بنية الصفحة وترتيب تحميل السكربتات
-2. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/js/config.js` — ٣٣ سطر — الإعدادات الثابتة ودوال التاريخ
-3. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/js/shared.js` — ٩٢ سطر — الأدوات المشتركة بين كل الشاشات
-4. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/js/sync.js` — ١٥٢ سطر — المزامنة والكاش وطابور الحفظ
-5. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/js/auth.js` — ١٠٤ سطر — الجلسات والصلاحيات
-6. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/js/main.js` — ٢٩٤ سطر — التنقل والإقلاع
-7. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/sw.js` — ٨٢ سطر — العمل بدون إنترنت
+1. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/index.html` — ٣٠٩ سطر — بنية الصفحة وترتيب تحميل السكربتات
+2. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/js/config.js` — ٣٣ سطر — الإعدادات الثابتة ودوال التاريخ
+3. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/js/shared.js` — ٩٢ سطر — الأدوات المشتركة بين كل الشاشات
+4. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/js/sync.js` — ١٥٢ سطر — المزامنة والكاش وطابور الحفظ
+5. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/js/auth.js` — ١٠٤ سطر — الجلسات والصلاحيات
+6. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/js/main.js` — ٢٩٤ سطر — التنقل والإقلاع
+7. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/sw.js` — ٨٢ سطر — العمل بدون إنترنت
 
 **الخادم**
 
-8. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/apps-script/Code.gs` — ١٢٧٧ سطر — الخادم كاملاً: المصادقة والصلاحيات وكل نقاط النهاية والواتساب والنسخ الاحتياطي
+8. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/apps-script/Code.gs` — ١٢٧٧ سطر — الخادم كاملاً: المصادقة والصلاحيات وكل نقاط النهاية والواتساب والنسخ الاحتياطي
 
 **الشاشات**
 
-9. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/js/report.js` — ٧١٨ سطر — التقارير والتصدير
-10. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/js/juices.js` — ٤٨٤ سطر — جرد العصيرات
-11. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/js/remaining.js` — ٤٢٠ سطر — المتبقي والانحراف
-12. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/js/receiving.js` — ٣٩٠ سطر — الاستلام
-13. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/js/settings.js` — ٣٤٨ سطر — الإعدادات
-14. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/js/camera.js` — ٣٣٠ سطر — الكاميرا والتوثيق البصري
-15. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/js/tomorrow.js` — ٣١٤ سطر — طلبية الغد
-16. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/js/branches.js` — ٢٦٠ سطر — الفروع والافتتاح والإغلاق
-17. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/js/checklist.js` — ٢٥٨ سطر — قوائم الفحص
-18. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/js/dashboard.js` — ٢٥١ سطر — الرئيسية
-19. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/js/waste.js` — ٢٣١ سطر — سجل الهدر
-20. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/js/items.js` — ٢٢٦ سطر — إدارة الأصناف
-21. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/js/audit.js` — ١٢٩ سطر — سجل الأنشطة
-22. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/js/forecast.js` — ١١٧ سطر — محرك اقتراح الكميات
-23. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/js/users.js` — ١٠٠ سطر — المستخدمون
+9. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/js/report.js` — ٧١٨ سطر — التقارير والتصدير
+10. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/js/juices.js` — ٤٨٤ سطر — جرد العصيرات
+11. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/js/remaining.js` — ٤٢٠ سطر — المتبقي والانحراف
+12. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/js/receiving.js` — ٣٩٠ سطر — الاستلام
+13. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/js/settings.js` — ٣٤٨ سطر — الإعدادات
+14. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/js/camera.js` — ٣٣٠ سطر — الكاميرا والتوثيق البصري
+15. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/js/tomorrow.js` — ٣١٤ سطر — طلبية الغد
+16. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/js/branches.js` — ٢٦٠ سطر — الفروع والافتتاح والإغلاق
+17. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/js/checklist.js` — ٢٥٨ سطر — قوائم الفحص
+18. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/js/dashboard.js` — ٢٥١ سطر — الرئيسية
+19. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/js/waste.js` — ٢٣١ سطر — سجل الهدر
+20. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/js/items.js` — ٢٢٦ سطر — إدارة الأصناف
+21. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/js/audit.js` — ١٢٩ سطر — سجل الأنشطة
+22. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/js/forecast.js` — ١١٧ سطر — محرك اقتراح الكميات
+23. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/js/users.js` — ١٠٠ سطر — المستخدمون
 
 **التكامل والتنسيق**
 
-24. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/tabsense-sync/pull-tabsense.js` — ٣١٢ سطر — سحب المبيعات من الكاشير
-25. `https://raw.githubusercontent.com/hasanoyouna-lab/prohouse/main/css/style.css` — ١١٦٣ سطر
+24. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/tabsense-sync/pull-tabsense.js` — ٣١٢ سطر — سحب المبيعات من الكاشير
+25. `https://raw.githubusercontent.com/prohouse-official/prohouse/main/css/style.css` — ١١٦٣ سطر
 
 ---
 

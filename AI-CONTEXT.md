@@ -94,7 +94,7 @@
 
 ## ٧. الكود
 
-مستودع عام: `https://github.com/hasanoyouna-lab/prohouse`
+مستودع عام: `https://github.com/prohouse-official/prohouse`
 
 - واجهة HTML/CSS/JavaScript بلا أي إطار عمل أو خطوة بناء.
 - الباك اند ملف واحد `apps-script/Code.gs` على Google Apps Script فوق Google Sheet.
