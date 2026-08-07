@@ -238,7 +238,7 @@ function renderRemainingView(receivingData, salesData) {
       <div class="category-summary-card">
         <div class="cat-card-header" onclick="toggleCategoryGroup('${cat}')">
           <div class="cat-title-block">
-            <h3>📂 ${cat}</h3>
+            <h3>${categoryIconSticker(cat)} ${cat}</h3>
             ${isMealCat ? `<span class="badge ${catBadge.class}">${catBadge.label} (${catVariancePct > 0 ? '+' : ''}${catVariancePct.toFixed(1)}%)</span>` : ''}
             <span class="badge neutral" style="margin-right:6px;">${filledCount}/${catItems.length} مكتمل</span>
           </div>

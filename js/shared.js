@@ -20,6 +20,23 @@ function thresholdFrom(key, fallback) {
 // الوجبة عند برو هاوس ~150 جرام — نحسب عدد الوجبات للأصناف اللي بتتوزن (دجاج/لحم/بحري) فقط
 const MEAL_WEIGHT_G = 150;
 const MEAL_CATEGORIES = ["دجاج", "لحم", "بحري", "ساندويتشات"];
+// ---- ملصق وأيقونة التصنيف ----
+function categoryIconSticker(catName) {
+  if (!catName) return "📂";
+  const c = String(catName).trim();
+  if (c.includes("دجاج")) return "🍗";
+  if (c.includes("لحم")) return "🥩";
+  if (c.includes("بحري") || c.includes("سمك") || c.includes("أسماك")) return "🐟";
+  if (c.includes("فطور") || c.includes("ساندويتش")) return "🥪";
+  if (c.includes("عصير")) return "🥤";
+  if (c.includes("سلط")) return "🥗";
+  if (c.includes("حلو") || c.includes("حلويات")) return "🍰";
+  if (c.includes("صوص")) return "🧄";
+  if (c.includes("كارب") || c.includes("أرز") || c.includes("ارز")) return "🍚";
+  if (c.includes("معدات") || c.includes("أدوات")) return "🛠️";
+  return "📂";
+}
+
 function isMealCategory(cat) { return MEAL_CATEGORIES.includes(cat); }
 function mealsCount(grams) {
   const n = Number(grams);

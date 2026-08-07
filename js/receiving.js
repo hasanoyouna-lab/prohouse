@@ -172,7 +172,7 @@ function renderReceivingView() {
     html += `
       <div class="category-section${receivingCollapsed[cat] ? " collapsed" : ""}" data-cat="${cat}">
         <div class="category-header" onclick="toggleReceivingCategory('${String(cat).replace(/'/g, "\\'")}')">
-          <span class="cat-label">📁 ${cat}</span>
+          <span class="cat-label">${categoryIconSticker(cat)} ${cat}</span>
           <span style="display:flex;align-items:center;">
             <span class="cat-count">${done}/${byCat[cat].length}</span>
             <span class="chevron">▾</span>

@@ -94,7 +94,7 @@ function renderTomorrowView() {
     const header = document.createElement("div");
     header.className = "category-header";
     header.innerHTML = `
-      <span class="cat-label">${group.category}</span>
+      <span class="cat-label">${categoryIconSticker(group.category)} ${group.category}</span>
       <span style="display:flex;align-items:center;">
         <span class="cat-count" id="tomcatcount-${cssId(group.category)}"></span>
         <span class="chevron">▾</span>
