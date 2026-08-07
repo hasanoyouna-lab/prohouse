@@ -2,6 +2,8 @@
 
 const TAB_ROLE_ACCESS = {
   dashboard: ["owner", "manager", "chef", "employee"],
+  receiving: ["owner", "manager", "chef", "employee"],
+  remaining: ["owner", "manager", "chef", "employee"],
   entry: ["owner", "manager", "chef", "employee"],
   tomorrow: ["owner", "manager", "chef", "employee"],
   juices: ["owner", "manager", "employee"],
@@ -36,6 +38,11 @@ function setActiveTab(tab) {
 
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
 
+  const receivingView = document.getElementById("receivingView");
+  const remainingView = document.getElementById("remainingView");
+  if (receivingView) receivingView.classList.toggle("hidden", tab !== "receiving");
+  if (remainingView) remainingView.classList.toggle("hidden", tab !== "remaining");
+
   document.getElementById("dashboardView").classList.toggle("hidden", tab !== "dashboard");
   document.getElementById("entryView").classList.toggle("hidden", tab !== "entry");
   document.getElementById("tomorrowView").classList.toggle("hidden", tab !== "tomorrow");
@@ -45,16 +52,28 @@ function setActiveTab(tab) {
   document.getElementById("itemsView").classList.toggle("hidden", tab !== "items");
   document.getElementById("settingsView").classList.toggle("hidden", tab !== "settings");
 
+  const recDateBar = document.getElementById("receivingDateBar");
+  const remDateBar = document.getElementById("remainingDateBar");
+  if (recDateBar) recDateBar.classList.toggle("hidden", tab !== "receiving");
+  if (remDateBar) remDateBar.classList.toggle("hidden", tab !== "remaining");
+
   document.getElementById("entryDateBar").classList.toggle("hidden", tab !== "entry");
   document.getElementById("tomorrowDateBar").classList.toggle("hidden", tab !== "tomorrow");
   document.getElementById("juiceDateBar").classList.toggle("hidden", tab !== "juices");
   document.getElementById("checklistDateBar").classList.toggle("hidden", tab !== "checklist");
+
+  const saveBarReceiving = document.getElementById("saveBarReceiving");
+  const saveBarRemaining = document.getElementById("saveBarRemaining");
+  if (saveBarReceiving) saveBarReceiving.classList.toggle("hidden", tab !== "receiving" || Auth.isViewOnlyEntry());
+  if (saveBarRemaining) saveBarRemaining.classList.toggle("hidden", tab !== "remaining" || Auth.isViewOnlyEntry());
 
   document.getElementById("saveBarEntry").classList.toggle("hidden", tab !== "entry" || Auth.isViewOnlyEntry());
   document.getElementById("saveBarTomorrow").classList.toggle("hidden", tab !== "tomorrow" || Auth.isViewOnlyTomorrow());
   document.getElementById("saveBarJuices").classList.toggle("hidden", tab !== "juices" || Auth.isViewOnlyEntry());
   document.getElementById("saveBarChecklist").classList.toggle("hidden", tab !== "checklist" || Auth.isViewOnlyEntry());
 
+  if (tab === "receiving") { loadReceivingData(currentReceivingDate, currentReceivingBranch); }
+  if (tab === "remaining") { loadRemainingData(currentRemainingDate, currentRemainingBranch); }
   if (tab === "dashboard") { renderDashboard(); }
   if (tab === "checklist") { renderChecklistView(); }
   if (tab === "report") {
@@ -152,12 +171,38 @@ function initChecklistTab() {
   }
 }
 
+function initReceivingTab() {
+  initReceivingModule();
+  const dateEl = document.getElementById("receivingDateInput");
+  if (dateEl) {
+    dateEl.value = currentReceivingDate;
+    dateEl.addEventListener("change", () => {
+      currentReceivingDate = dateEl.value;
+      loadReceivingData(currentReceivingDate, currentReceivingBranch);
+    });
+  }
+}
+
+function initRemainingTab() {
+  initRemainingModule();
+  const dateEl = document.getElementById("remainingDateInput");
+  if (dateEl) {
+    dateEl.value = currentRemainingDate;
+    dateEl.addEventListener("change", () => {
+      currentRemainingDate = dateEl.value;
+      loadRemainingData(currentRemainingDate, currentRemainingBranch);
+    });
+  }
+}
+
 function startApp() {
   hideLoginView();
   applyRoleUiGating();
   updateOfflineBanner();
   updateSyncBadge({ pending: Sync.getQueue().length });
   loadSettings();
+  initReceivingTab();
+  initRemainingTab();
   initDashboardTab();
   initEntryTab();
   initTomorrowTab();

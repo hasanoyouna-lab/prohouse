@@ -269,6 +269,10 @@ function doGet(e) {
         requireBranchAccess_(employee, e.parameter.branch);
         data = getSalesByCategory(e.parameter.start, e.parameter.end, e.parameter.branch);
         break;
+      case 'getRemainingReport':
+        requireBranchAccess_(employee, e.parameter.branch);
+        data = getRemainingReport(e.parameter.date, e.parameter.branch);
+        break;
       case 'backupAll':
         if (employee.role !== 'owner') throw new Error('غير مصرح');
         data = backupAll();
@@ -290,7 +294,6 @@ function doPost(e) {
     if (body.action === 'login') return jsonOut({ ok: true, data: login(body.payload && body.payload.pin) });
     if (body.action === 'logout') return jsonOut({ ok: true, data: logout(body.token) });
 
-    // مصادقة منفصلة عن جلسات الموظفين — لسكربتات الأتمتة (مثل سحب تابسنس) اللي بتشتغل بدون تسجيل دخول بشري
     if (body.action === 'importSalesByCategory') {
       requireIntegrationToken_(body.integrationToken);
       return jsonOut({ ok: true, data: importSalesByCategory(body.payload) });
@@ -318,6 +321,11 @@ function doPost(e) {
         if (employee.role === 'chef') throw new Error('غير مصرح — الشيف يشوف بس');
         requireBranchAccess_(employee, body.payload.branch);
         data = saveDay(body.payload);
+        break;
+      case 'saveRemainingReport':
+        if (employee.role === 'chef') throw new Error('غير مصرح — الشيف يشوف بس');
+        requireBranchAccess_(employee, body.payload.branch);
+        data = saveRemainingReport(body.payload);
         break;
       case 'saveTomorrowOrder':
         if (employee.role === 'chef') throw new Error('غير مصرح — الشيف يشوف بس');
@@ -1247,8 +1255,24 @@ function clearSheetDataRows_(sheetName) {
       s.getRange(2, 1, lastRow - 1, s.getLastColumn()).clearContent();
     }
   } catch (e) {
-    Logger.log('clearSheetDataRows error: ' + e);
+    Logger.log("clearSheetDataRows error for " + sheetName + ": " + e);
   }
 }
 
+function getRemainingReport(date, branch) {
+  var entries = readRows(SHEET_NAMES.DAILY).rows.filter(function (r) { return r.date === date && r.branch === branch; });
+  var metaRows = readRows(SHEET_NAMES.DAYMETA).rows.filter(function (r) { return r.date === date && r.branch === branch; });
+  return { date: date, branch: branch, meta: metaRows[0] || null, items: entries };
+}
 
+function saveRemainingReport(p) {
+  var savedAt = nowIso();
+  (p.items || []).forEach(function (it) {
+    appendRow(SHEET_NAMES.DAILY, {
+      date: p.date, branch: p.branch, itemId: it.itemId, itemName: it.itemName, unit: it.unit,
+      remaining: it.remaining, remainingWeight: it.remainingWeight, remainingSauce: it.remainingSauce,
+      notes: it.notes || '', savedAt: savedAt
+    });
+  });
+  return { date: p.date, branch: p.branch, savedAt: savedAt };
+}

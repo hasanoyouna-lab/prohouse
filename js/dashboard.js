@@ -137,9 +137,45 @@ async function renderDashboard() {
 
   const tasks = buildTasks(statuses);
 
+  const activeBranch = Branch.get() || allowedBranchList()[0] || "";
+  const currentStatusObj = statuses.find(s => s.branch === activeBranch) || statuses[0] || {};
+  
+  let healthBadge = { label: "🟢 الوضع التشغيلي طبيعي", class: "ok" };
+  if (currentStatusObj.status === "partial" || currentStatusObj.touched < currentStatusObj.total) {
+    healthBadge = { label: "🟡 يحتاج متابعة لتطابق الاستلام والجرد", class: "warn" };
+  } else if (currentStatusObj.status === "none") {
+    healthBadge = { label: "🔴 لم يتم اعتماد الاستلام والجرد لليوم بعد", class: "danger" };
+  }
+
   view.innerHTML = `
     <div class="dash-greeting">${greeting}${name ? " " + name : ""} 👋</div>
     <div class="dash-date">${new Date().toLocaleDateString("ar-EG", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</div>
+
+    <div class="dash-executive-panel" style="background:var(--card);border:2.5px solid var(--black);border-radius:var(--radius);padding:16px;margin-bottom:16px;box-shadow:var(--shadow);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
+        <div style="font-size:16px;font-weight:900;color:var(--black);">الوضع التشغيلي لفرع ${activeBranch}</div>
+        <span class="badge ${healthBadge.class}" style="font-size:13px;padding:7px 14px;">${healthBadge.label}</span>
+      </div>
+
+      <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">
+        <div class="stat" style="background:#FFF8E1;border:1.5px solid var(--black);">
+          <div class="v" style="font-size:18px;">${Math.round(currentStatusObj.mealsToday || 0)}</div>
+          <div class="l">وجبات مستلمة اليوم</div>
+        </div>
+        <div class="stat" style="background:#E8F5E9;border:1.5px solid var(--black);">
+          <div class="v" style="font-size:18px;">${currentStatusObj.confirmed || 0}/${currentStatusObj.total || 0}</div>
+          <div class="l">أصناف مؤكدة</div>
+        </div>
+        <div class="stat" style="background:#FFF3E0;border:1.5px solid var(--black);">
+          <div class="v" style="font-size:18px;">${currentStatusObj.juicesCounted || 0}/${currentStatusObj.juicesTotal || 0}</div>
+          <div class="l">جرد العصيرات</div>
+        </div>
+        <div class="stat" style="background:#F3E5F5;border:1.5px solid var(--black);">
+          <div class="v" style="font-size:18px;">${currentStatusObj.checklistPercent || 0}%</div>
+          <div class="l">قائمة الفحص اليومية</div>
+        </div>
+      </div>
+    </div>
 
     <div class="dash-tasks" id="dashTasks">
       <div class="dash-tasks-title">${tasks.length ? "المطلوب منك الآن" : "خلّصت كل شي لليوم"}</div>

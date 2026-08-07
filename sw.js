@@ -1,7 +1,7 @@
 // Service Worker: يخزّن هيكل التطبيق (HTML/CSS/JS) محلياً حتى يفتح بدون إنترنت نهائياً.
-// يُجبر المتصفحات على مسح الذاكرة القديمة فوراً وعرض الواجهة الجانبية الحديثة.
+// تحديث شامل v40 — يفصل تقرير الاستلام عن تقرير المتبقي والجرد والانحراف التشغيلي.
 
-const CACHE_NAME = "prohouse-shell-v30";
+const CACHE_NAME = "prohouse-shell-v40";
 
 function isAppCode(url) {
   return url.pathname.endsWith(".html") || url.pathname.endsWith(".js") ||

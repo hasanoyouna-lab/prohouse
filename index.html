@@ -75,6 +75,14 @@ if ('serviceWorker' in navigator) {
         <span class="nav-icon">🏠</span>
         <span class="nav-text">الرئيسية</span>
       </button>
+      <button class="tab-btn nav-item" data-tab="receiving">
+        <span class="nav-icon">📦</span>
+        <span class="nav-text">تقرير الاستلام</span>
+      </button>
+      <button class="tab-btn nav-item" data-tab="remaining">
+        <span class="nav-icon">📊</span>
+        <span class="nav-text">تقرير المتبقي والجرد</span>
+      </button>
       <button class="tab-btn nav-item" data-tab="entry">
         <span class="nav-icon">📝</span>
         <span class="nav-text">طلبية اليوم</span>
@@ -92,7 +100,7 @@ if ('serviceWorker' in navigator) {
         <span class="nav-text">قائمة الفحص</span>
       </button>
       <button class="tab-btn nav-item" data-tab="report">
-        <span class="nav-icon">📊</span>
+        <span class="nav-icon">📈</span>
         <span class="nav-text">التقارير والمبيعات</span>
       </button>
       <button class="tab-btn nav-item" data-tab="items">
@@ -131,6 +139,12 @@ if ('serviceWorker' in navigator) {
     </header>
 
     <div class="topbar-datebars">
+      <div class="datebar hidden" id="receivingDateBar">
+        <input type="date" id="receivingDateInput">
+      </div>
+      <div class="datebar hidden" id="remainingDateBar">
+        <input type="date" id="remainingDateInput">
+      </div>
       <div class="datebar hidden" id="entryDateBar">
         <input type="date" id="dateInput">
       </div>
@@ -149,6 +163,10 @@ if ('serviceWorker' in navigator) {
       <div id="offlineBanner" class="offline-banner hidden">غير متصل بالإنترنت — بتشتغل ببيانات محفوظة محلياً وبتتزامن لما يرجع النت</div>
 
       <div id="dashboardView" class="view"></div>
+
+      <div id="receivingView" class="view hidden"></div>
+
+      <div id="remainingView" class="view hidden"></div>
 
       <div id="entryView" class="view hidden"></div>
 
@@ -212,19 +230,29 @@ if ('serviceWorker' in navigator) {
   </div>
 </div>
 
+<div class="save-bar hidden" id="saveBarReceiving">
+  <div class="save-status" id="receivingSaveStatus">جاهز لحفظ تقرير الاستلام</div>
+  <button class="save-btn" id="receivingSaveBtn" onclick="saveReceivingReportData()">💾 حفظ تقرير الاستلام</button>
+</div>
+
+<div class="save-bar hidden" id="saveBarRemaining">
+  <div class="save-status" id="remainingSaveStatus">جاهز لحفظ تقرير المتبقي والجرد</div>
+  <button class="save-btn" id="remainingSaveBtn" onclick="saveRemainingReportData()">💾 حفظ تقرير المتبقي والجرد</button>
+</div>
+
 <div class="save-bar hidden" id="saveBarEntry">
   <div class="save-status" id="saveStatus">لسا ما تحفظ شي لهذا اليوم</div>
-  <button class="save-btn" id="saveBtn">💾 حفظ اليوم</button>
+  <button class="save-btn" id="saveBtn">💾 حفظ يوم كامل</button>
 </div>
 
 <div class="save-bar hidden" id="saveBarTomorrow">
-  <div class="save-status" id="tomorrowStatus">لسا ما تحفظ شي</div>
-  <button class="save-btn" id="tomorrowSaveBtn">💾 حفظ الطلبية</button>
+  <div class="save-status" id="tomorrowStatus">لسا ما تحفظ شيء لطلبية الغد</div>
+  <button class="save-btn" id="tomorrowSaveBtn" onclick="saveTomorrowData()">💾 حفظ وإرسال طلبية الغد</button>
 </div>
 
 <div class="save-bar hidden" id="saveBarJuices">
-  <div class="save-status" id="juiceStatus">لسا ما تحفظ جرد لهذا اليوم</div>
-  <button class="save-btn" id="juiceSaveBtn">💾 حفظ الجرد</button>
+  <div class="save-status" id="juiceStatus">لسا ما تحفظ شيء لجرد العصيرات</div>
+  <button class="save-btn" id="juiceSaveBtn" onclick="saveJuiceDayData()">💾 حفظ جرد العصيرات</button>
 </div>
 
 <div class="save-bar hidden" id="saveBarChecklist">
@@ -234,22 +262,21 @@ if ('serviceWorker' in navigator) {
 
 <div class="toast" id="toast"></div>
 
-<!-- ExcelJS و Chart.js ما بينحمّلوا مع الإقلاع — بينجلبوا بس أول ما تُفتح شاشة التقارير
-     (شوف loadReportLibs بـ js/report.js). حجمهم مع بعض أكبر من التطبيق كله، وأغلب الموظفين
-     ما بيفتحوا التقارير أصلاً؛ تحميلهم بالبداية كان بيبطّئ الفتح على جوالات النت الضعيف. -->
-<script src="js/config.js?v=3.0.0"></script>
-<script src="js/auth.js?v=3.0.0"></script>
-<script src="js/sync.js?v=3.0.0"></script>
-<script src="js/entry.js?v=3.0.0"></script>
-<script src="js/items.js?v=3.0.0"></script>
-<script src="js/forecast.js?v=3.0.0"></script>
-<script src="js/tomorrow.js?v=3.0.0"></script>
-<script src="js/juices.js?v=3.0.0"></script>
-<script src="js/checklist.js?v=3.0.0"></script>
-<script src="js/report.js?v=3.0.0"></script>
-<script src="js/settings.js?v=3.0.0"></script>
-<script src="js/dashboard.js?v=3.0.0"></script>
-<script src="js/main.js?v=3.0.0"></script>
+<script src="js/config.js?v=3.1.0"></script>
+<script src="js/auth.js?v=3.1.0"></script>
+<script src="js/sync.js?v=3.1.0"></script>
+<script src="js/items.js?v=3.1.0"></script>
+<script src="js/receiving.js?v=3.1.0"></script>
+<script src="js/remaining.js?v=3.1.0"></script>
+<script src="js/entry.js?v=3.1.0"></script>
+<script src="js/forecast.js?v=3.1.0"></script>
+<script src="js/tomorrow.js?v=3.1.0"></script>
+<script src="js/juices.js?v=3.1.0"></script>
+<script src="js/checklist.js?v=3.1.0"></script>
+<script src="js/report.js?v=3.1.0"></script>
+<script src="js/settings.js?v=3.1.0"></script>
+<script src="js/dashboard.js?v=3.1.0"></script>
+<script src="js/main.js?v=3.1.0"></script>
 
 </body>
 </html>
