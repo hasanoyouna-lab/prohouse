@@ -167,7 +167,7 @@ function renderRemainingView(receivingData, salesData) {
     let catReceivedSum = 0;
     let catActualRemainingSum = 0;
 
-    const itemsRowsHtml = catItems.map(it => {
+    const itemsCardsHtml = catItems.map(it => {
       const recEntry = receivingMap[it.id] || {};
       const recQty = Number(recEntry.received || 0);
       catReceivedSum += recQty;
@@ -179,36 +179,48 @@ function renderRemainingView(receivingData, salesData) {
       grandTotalActualRemainingWeight += actualWeight;
 
       return `
-        <tr class="remaining-item-row" data-item-id="${it.id}">
-          <td class="cat-cell">
-            <strong>${it.name}</strong>
-            <div class="unit-sub">${it.unit || 'جرام'}</div>
-          </td>
-          <td><strong>${recQty ? Math.round(recQty) : '—'}</strong></td>
-          <td>
-            <input type="number" step="any" min="0" 
-                   value="${remData.remainingWeight || remData.remaining || ''}" 
-                   placeholder="الوزن المتبقي" 
-                   ${isClosed ? 'disabled' : ''}
-                   oninput="onRemainingWeightChange('${it.id}', this.value)"
-                   class="remaining-input">
-          </td>
-          <td>
-            <input type="number" step="any" min="0" 
-                   value="${remData.remainingSauce || ''}" 
-                   placeholder="الصوص المتبقي" 
-                   ${isClosed ? 'disabled' : ''}
-                   oninput="onRemainingSauceChange('${it.id}', this.value)"
-                   class="remaining-input sauce-input">
-          </td>
-          <td>
+        <div class="item-card remaining-item-card" data-item-id="${it.id}">
+          <div class="item-header-row">
+            <div>
+              <span class="item-name">${it.name}</span>
+              <span class="item-unit">(${it.unit || "جرام"})</span>
+            </div>
+          </div>
+
+          <div class="inputs-row">
+            <div class="field">
+              <label>المستلم (جم)</label>
+              <input type="text" value="${recQty ? Math.round(recQty) : '—'}" readonly class="readonly-input">
+            </div>
+
+            <div class="field">
+              <label>الوزن المتبقي الفعلي *</label>
+              <input type="number" step="any" min="0" 
+                     value="${remData.remainingWeight || remData.remaining || ''}" 
+                     placeholder="0" 
+                     ${isClosed ? 'disabled' : ''}
+                     oninput="onRemainingWeightChange('${it.id}', this.value)"
+                     class="remaining-input">
+            </div>
+
+            <div class="field">
+              <label>الصوص المتبقي *</label>
+              <input type="number" step="any" min="0" 
+                     value="${remData.remainingSauce || ''}" 
+                     placeholder="0" 
+                     ${isClosed ? 'disabled' : ''}
+                     oninput="onRemainingSauceChange('${it.id}', this.value)"
+                     class="remaining-input sauce-input">
+            </div>
+          </div>
+
+          <div class="notes-row">
             <input type="text" value="${remData.notes || ''}" 
-                   placeholder="ملاحظات..." 
+                   placeholder="ملاحظات الجرد والمتبقي..." 
                    ${isClosed ? 'disabled' : ''}
-                   oninput="onRemainingNotesChange('${it.id}', this.value)"
-                   class="remaining-notes-input">
-          </td>
-        </tr>
+                   oninput="onRemainingNotesChange('${it.id}', this.value)">
+          </div>
+        </div>
       `;
     }).join("");
 
@@ -254,21 +266,8 @@ function renderRemainingView(receivingData, salesData) {
         </div>
 
         <div class="cat-card-body" id="catBody_${cat}">
-          <div class="order-table-wrap">
-            <table class="order-table">
-              <thead>
-                <tr>
-                  <th>الصنف والوحدة</th>
-                  <th>المستلم (جم)</th>
-                  <th>الوزن المتبقي الفعلي *</th>
-                  <th>الصوص المتبقي *</th>
-                  <th>الملاحظات</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${itemsRowsHtml}
-              </tbody>
-            </table>
+          <div class="category-body-cards" style="padding:12px 0;">
+            ${itemsCardsHtml}
           </div>
         </div>
       </div>
